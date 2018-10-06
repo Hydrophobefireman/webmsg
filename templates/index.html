@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>WebMsg</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        #signup:hover {
+            box-shadow: 2px 2px;
+        }
+
+        #login {
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 4px;
+            border: 1px solid #6200ee;
+            outline: none;
+            color: #6200ee;
+            text-transform: uppercase;
+            width: 80px;
+            height: 30px;
+            margin: 10px;
+            cursor: pointer;
+        }
+
+        #signup {
+            color: #6200ee;
+            border-radius: 5px;
+            padding: 4px;
+            border: 1px solid #6200ee;
+            outline: none;
+            background-color: #fff;
+            text-transform: uppercase;
+            width: 80px;
+            height: 30px;
+            margin: 10px;
+            cursor: pointer;
+        }
+
+        #login:hover {
+            box-shadow: 2px 2px #d9dce0;
+        }
+
+        .submit-button {
+            -moz-border-radius: 5px;
+            -webkit-border-radius: 5px;
+            border-radius: 5px;
+            padding: 8px;
+            border: none;
+            outline: none;
+            background: #3367d6;
+            color: white;
+            text-transform: uppercase;
+            cursor: pointer;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            margin-top: 20px;
+        }
+
+        .input_n {
+            border: none;
+            border-bottom: 1px solid #6200ee;
+            outline: none;
+            width: 50%;
+            height: 20px;
+            padding: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="margin:auto;text-align: center;">
+        <div class="main">
+
+            <button id='login'>Login</button><button id='signup'>Signup</button>
+            <div id=lfbox style='display: none'>
+                <form id=login-form name='login-form' action='/login/check/' method="POST">
+                    <input placeholder="Username" class="input_n" name='user'>
+                    <input placeholder="password" class="input_n" name='password' type="password">
+                    <input type='hidden' name=integrity value='{{nonce}}'>
+                    <input type="submit" style="display: none">
+                </form>
+                <button class=submit-button onclick="document.getElementById('login-form').submit()">Login</button>
+            </div>
+            <div id=rfbox style='display: none'>
+                <form id=register-form action='/register/check/' method="POST">
+                    <input placeholder="Username" class="input_n" name='user'>
+                    <input placeholder="Password" class="input_n" name='password' type="password">
+                    <input placeholder="Confirm password" name=checkpw class="input_n" type="password">
+                    <input type='hidden' name=integrity value='{{nonce}}'>
+                    <input type="submit" style="display: none">
+                </form>
+                <button class=submit-button onclick="document.getElementById('register-form').submit()">Signup</button>
+            </div>
+        </div>
+        <script>
+            const loginb = document.getElementById("login");
+            const signupb = document.getElementById("signup");
+            loginb.onclick = () => {
+                login.style.backgroundColor = "#6200ee";
+                login.style.color = '#fff';
+                signupb.style.backgroundColor = "#fff";
+                signupb.style.color = "#6200ee";
+                document.getElementById("lfbox").style.display = 'block';
+                document.getElementById("rfbox").style.display = 'none';
+            }
+            signupb.onclick = () => {
+                signupb.style.backgroundColor = "#6200ee";
+                signupb.style.color = '#fff';
+                loginb.style.backgroundColor = "#fff";
+                loginb.style.color = "#6200ee";
+                document.getElementById("rfbox").style.display = 'block';
+                document.getElementById("lfbox").style.display = 'none';
+            }
+        </script>
+    </div>
+</body>
+
+</html>
