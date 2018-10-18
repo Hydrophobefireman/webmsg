@@ -40,9 +40,10 @@ class flaskUtils(object):
                 and "127.0.0.1" not in request.url
                 and "localhost" not in request.url
                 and "herokuapp." in request.url
+                and "http://" in request.url[:8]
             ):
                 return redirect(
-                    request.url.replace("http://", "https://"), status_code=301
+                    request.url.replace("http://", "https://"), status_code=302
                 )
 
         @app.after_request
