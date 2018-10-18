@@ -105,16 +105,6 @@ def is_heroku(url):
     ) and "herokuapp" in parsedurl
 
 
-@app.before_request
-async def enforce_https():
-    if (
-        request.endpoint in app.view_functions
-        and request.url.startswith("http://")
-        and not request.is_secure
-        and is_heroku(request.url)
-    ):
-        return redirect(request.url.replace("http://", "https://"), status_code=301)
-
 
 @app.route("/web/", strict_slashes=False)
 async def rtcs():
