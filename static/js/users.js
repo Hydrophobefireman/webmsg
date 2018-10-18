@@ -1,4 +1,6 @@
-(() => {
+(async () => {
+    (new Image).src = "/static/attachment.svg";
+    (new Image).src = "/static/close.svg"
     const $ = {
             id: (_id) => {
                 return document.getElementById(_id)
@@ -34,16 +36,6 @@
     });
 
     function create_chat_box(u) {
-        const __SKELETON__ = `
-        <div class="chat_box_wrap">
-            <div class="chat_box">
-                <div class="chat_head"></div>
-                <div id=menubox>   </div>
-                <div class="chat_body"></div>
-                <input type="text" placeholder="type a message">
-                <img src="" class=context>
-            </div>
-        </div>`
         results_all.innerHTML = "";
         swindow.style.display = 'none';
         searchbox.style.display = 'none';
@@ -104,25 +96,26 @@
         const websocket_url = `${(window.location.protocol === 'https:' ? "wss://" : "ws://") +
         window.location.host}/@/messenger/`;
         const ws = new WebSocket(websocket_url);
-        check_page_cache(ws, u);
-        ws.onopen = () => {
-            console.log('Socket Opened')
-        }
-        ws.onclose = () => {
-            bod.innerHTML = 'Connection to the server Broke..Please reload the page'
-        }
         ws.onmessage = e => {
             const msg = e.data;
             try {
                 const js = JSON.parse(msg);
-                parse_message(bod, js, $user);
                 if (js.hasOwnProperty('error')) {
-                    return bod.innerHTML = 'An error occured Please reload the page'
+                    console.log('prop-error', js)
+                    return bod.innerHTML += '<br>An error occured Please reload the page'
                 }
+                parse_message(bod, js);
             } catch (e) {
-                console.log(e);
-                bod.innerHTML = 'An error occured Please reload the page'
+                console.log(e, "ERR");
+                bod.innerHTML += '<br>An error occured Please reload the page'
             }
+        }
+        ws.onopen = () => {
+            check_page_cache(ws, u);
+            console.log('Socket Opened')
+        }
+        ws.onclose = () => {
+            bod.innerHTML += "<br>Connection to server was lost. Please Reload the page"
         }
 
         function check_page_cache(ws, user) {
@@ -137,42 +130,179 @@
             return ws
         }
 
-        function parse_message(parent_element, js, user) {
-            function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp) {
+        function parse_message(parent_element, js) {
+            function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp, media = null) {
                 let msg_class;
-                if (sender === HERE) {
-                    msg_class = 'msg_recieved'
-                } else {
-                    msg_class = "msg_sent"
-                }
                 const msg = $.create("div");
+                if (sender === HERE) {
+                    msg_class = 'msg_sent'
+                    msg.style.marginLeft = 'auto'
+                } else {
+                    msg_class = "msg_recieved";
+                    msg.style.marginRight = 'auto'
+                }
                 $.set(msg, "class", `msg ${msg_class}`);
-                msg.textContent = message;
+                if (media) {
+                    $.set(msg, "data-media", media)
+                    const img = new Image;
+                    img.src = '/static/attachment.svg';
+                    msg.appendChild(img);
+                    msg.style.fontSize = '12px';
+                    msg.appendChild += "Media Message";
+                } else {
+                    $.set(msg, "data-media", null)
+                    msg.textContent = message;
+                }
+
+                function slidein(el) {;
+                    el.style.padding = '0px';
+                    el.style.opacity = 0;
+                    el.style.height = '0'
+                }
+
+                function slideout(el) {
+                    el.style.padding = '5px';
+                    el.style.opacity = 1;
+                    el.style.height = 'auto';
+                }
                 $.set(msg, "data-sender", sender);
                 $.set(msg, "data-receiver", receiver);
                 $.set(msg, "data-stamp", stamp);
                 $.set(msg, 'data-msgid', msgid);
                 $.set(msg, "data-read", read);
                 $.set(msg, "data-rstamp", rstamp)
-                box.appendChild(msg)
+                box.appendChild(msg);
+                box.scrollTop = box.scrollHeight;
+                msg.onclick = function () {
+                    const dataset = this.dataset,
+                        sender = dataset.sender,
+                        receiver = dataset.receiver,
+                        stamp = parseInt(dataset.stamp),
+                        msgid = dataset.msgid,
+                        read = dataset.read,
+                        rstamp = parseInt(dataset.rstamp),
+                        media = dataset.media;
+                    const __par = $.id("message-info");
+                    __par.innerHTML = '';
+                    __par.style.opacity = '1';
+                    const close_this = $.create("div");
+                    $.set(close_this, 'class', "message-close");
+                    close_this.innerHTML = "Close"
+                    const $par_const = $.create("div");
+                    $par_const.style.transition = '0.3s ease-in-out';
+                    __par.appendChild(close_this);
+                    __par.appendChild($par_const);
+                    close_this.onclick = () => {
+                        $par_const.style.opacity = '0';
+                        $par_const.style.height = '0px';
+                        __par.style.opacity = '0';
+                        __par.innerHTML = ""
+                    }
+                    const sender_key = $.create("div"),
+                        sender_val = $.create("div");
+                    const read_key = $.create("div"),
+                        read_val = $.create("div");
+                    const stamp_key = $.create("div"),
+                        stamp_val = $.create("div");
+                    $.set(sender_key, "class", "message-info-key");
+                    $.set(sender_val, "class", "message-info-value");
+                    $.set(read_key, "class", "message-info-key");
+                    $.set(read_val, "class", "message-info-value");
+                    $.set(stamp_key, "class", "message-info-key");
+                    $.set(stamp_val, "class", "message-info-value");
+                    sender_key.onclick = () => {
+                        slideout(sender_val);
+                    }
+                    read_key.onclick = () => {
+                        slideout(read_val);
+                    }
+                    stamp_key.onclick = () => {
+                        slideout(stamp_val)
+                    }
+                    sender_key.textContent = 'Sender';
+                    sender_val.textContent = sender + (sender === HERE ? "(You)" : "");
+                    stamp_key.textContent = 'Time';
+                    stamp_val.textContent = new Date(stamp).toLocaleString();
+                    read_key.textContent = 'Read-Status';
+                    read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? new Date(rstamp).toLocaleString() : "N/A"})` : "Sent";
+                    if (media !== "null") {
+                        const media_key = $.create("div"),
+                            media_val = $.create("div");
+                        $.set(media_key, "class", "message-info-key");
+                        $.set(media_val, "class", "message-info-value");
+                        media_key.textContent = "Media Message";
+                        media_val.innerHTML = "Click To Open Media Preview";
+                        media_val.style.cursor = 'pointer'
+                        $.set(media_val, "data-media", media)
+                        slideout(media_val)
+                        media_val.onclick = () => {
+                            const val = media_val.dataset;
+                            const img = new Image;
+                            img.src = val.media;
+                            $par_const.innerHTML = '';
+                            const i = $.create("a");
+                            $par_const.appendChild(img);
+                            $par_const.appendChild(i);
+                            i.style.color = 'black';
+                            i.style.textDecoration = 'none';
+                            i.target = "__blank";
+                            i.style.display = 'block';
+                            i.innerHTML = 'Click To Open Image In A New Tab';
+                            i.href = val.media
+                            img.style.width = '160px';
+                            img.style.height = '100px';
+                        }
+                        $par_const.appendChild(media_key);
+                        $par_const.appendChild(media_val);
+                    }
+                    __par.style.display = 'block';
+                    $par_const.appendChild(sender_key);
+                    $par_const.appendChild(sender_val);
+                    $par_const.appendChild(stamp_key);
+                    $par_const.appendChild(stamp_val);
+                    $par_const.appendChild(read_key);
+                    $par_const.appendChild(read_val);
+                    console.log(dataset);
+                }
             }
-            console.log(js)
             if (js.typing) {
                 //if the user is typing..we dont need to create any element
-                return user.style.color = 'green'
+                return $user.style.color = 'green'
             }
-            user.style.color = '#fff';
+            $user.style.color = '#fff';
             if (js.fetch) {
-                console.log(js.data);
+                console.log("FETCHED DETAILS")
+                const data = js.data;
+                for (let i = 0; i < Object.keys(data).length; i++) {
+                    const __msg__ = data[i];
+                    __msg__.msgid = i;
+                    parse_message(parent_element, __msg__);
+                }
+            }
+            let text, sender, receiver, stamp, read, rstamp, msgid;
+            if (js.media || js.message) {
+                if (!js.read && !js.rstamp && js.sender !== HERE) {
+                    const _read = {
+                        user: js.sender,
+                        message: null,
+                        read: {
+                            id: js.msgid
+                        },
+                        stamp: new Date().getTime(),
+                        rstamp: new Date().getTime(),
+
+                    };
+                    ws.send(JSON.stringify(_read))
+                }
             }
             if (js.message) {
-                const text = js.message,
-                    sender = js.sender,
-                    receiver = js.receiver,
-                    stamp = js.stamp,
-                    read = js.read,
-                    rstamp = js.rstamp,
-                    msgid = js.msgid;
+                text = js.message;
+                sender = js.sender;
+                receiver = js.receiver;
+                stamp = js.stamp;
+                read = js.read;
+                rstamp = js.rstamp;
+                msgid = js.msgid;
                 return make_message_box(parent_element, text, sender, receiver, stamp, msgid, read, rstamp)
             }
             if (js.update) {
@@ -181,9 +311,16 @@
                 $.set(msg, "data-read", js.update.read);
                 $.set(msg, 'data-rstamp', js.update.rstamp)
             }
-            if (js.media) {}
-            const msgdiv = $.create("div");
-
+            if (js.media) {
+                const media_url = js.mediaURL;
+                sender = js.sender;
+                receiver = js.receiver;
+                read = js.read;
+                rstamp = js.rstamp;
+                stamp = js.stamp;
+                msgid = js.msgid;
+                make_message_box(parent_element, null, sender, receiver, stamp, msgid, read, rstamp, media_url)
+            }
 
         }
         attach.onclick = () => {
@@ -200,6 +337,7 @@
                     img.onload = async () => {
                         const data = await resize(img, 65, f.type);
                         const subm = await fetch("/@/binary/", {
+                            credentials: "include",
                             method: "post",
                             headers: {
                                 "x-file-name": f.name
@@ -207,7 +345,13 @@
                             body: data
                         });
                         const resp = await subm.json();
-                        return resp.url;
+                        const ws_data = {
+                            media: resp.url,
+                            message: null,
+                            user: u,
+                            stamp: new Date().getTime()
+                        };
+                        ws.send(JSON.stringify(ws_data));
                     }
                 }
                 reader.readAsDataURL(f);
@@ -227,13 +371,14 @@
         txtbox.onkeydown = function (e) {
             if (e.keyCode === 13) {
                 if (txtbox.value.replace(/\s/g, "").length > 0) {
+                    const stamp = new Date().getTime();
                     const value = txtbox.value;
                     const data = {
                         user: this.getAttribute("data-user"),
                         message: value,
                         typing: false,
                         media: null,
-                        stamp: new Date().getTime()
+                        stamp
                     };
                     ws.send(JSON.stringify(data))
                     txtbox.value = '';
@@ -246,8 +391,8 @@
         return `${Object.keys(json).
             map(key =>`${encodeURIComponent(key)}=${encodeURIComponent(json[key])}`)
             .join('&')}`;
-    }
 
+    }
 
     function paint_page(data) {
         const js = data.users;
@@ -282,6 +427,7 @@
             });
             const token = await _result.text();
             const results = await fetch("/api/users/", {
+                credentials: "include",
                 method: "post",
                 headers: {
                     "content-type": "application/x-www-form-urlencoded"
@@ -303,11 +449,8 @@
             }
         }
     }
-
     async function resize(img, quality, mime_type) {
         const canvas = document.createElement('canvas');
-        console.log(img);
-        console.log(img.width, img.height, img.naturalHeight, img.naturalWidth);
         if (img.naturalWidth === undefined && img.naturalHeight === undefined) {
             console.log(img, 'no natural width')
             return null

@@ -15,6 +15,7 @@ import passlib.hash as pwhash
 import requests
 from bs4 import BeautifulSoup as bs
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm.attributes import flag_modified
 from htmlmin.minify import html_minify
 from quart import (
     Quart,
@@ -194,6 +195,8 @@ async def messenger():
                 chat_data = None
                 chat_data_args = (session["user"], user, is_heroku(ws.url))
                 _connected_ = [s for s in users if s.idxs == user]
+                if session["user"] == user:
+                    ws.send(json.dumps({"error": "Invalid recepient"}))
                 chat = check_chat_data(*chat_data_args)
                 if not chat:
                     print(
@@ -228,19 +231,18 @@ async def messenger():
                         },
                     }
                     ind = alter_chat_data(chat_data)
-                    await ws.send(json.dumps({"msgid": ind}))
+                    to_send = json.dumps({**chat_data["data"], "msgid": ind})
+                    await ws.send(to_send)
                     if rec_user:
-                        await rec_user.send(
-                            json.dumps({**chat_data["data"], "msgid": ind})
-                        )
+                        await rec_user.send(to_send)
                 elif fetch:
                     await ws.send(
                         json.dumps(
                             {"data": check_chat_data(id_=chat_id).chats, "fetch": True}
                         )
                     )
-                elif read:
-                    data = json.loads(read)
+                elif read and read.get("user") != session["user"]:
+                    data = read
                     msgs = chat.chats
                     idx = data.get("id")
                     part_msg = msgs.get(idx)
@@ -274,11 +276,10 @@ async def messenger():
                         },
                     }
                     ind = alter_chat_data(chat_data)
-                    await ws.send(json.dumps({"msgid": ind}))
+                    to_send = json.dumps({**chat_data["data"], "msgid": ind})
+                    await ws.send(to_send)
                     if rec_user:
-                        await rec_user.send(
-                            json.dumps({**chat_data["data"], "msgid": ind})
-                        )
+                        await rec_user.send(to_send)
 
         except Exception as e:
             await ws.send(
@@ -291,25 +292,30 @@ async def messenger():
 
 def alter_chat_data(data, update=False):
     # pylint: disable=E1101
-    if update and not data.get("msgid"):
+    if update and data.get("msgid") is None:
         raise ValueError("Cannot Update without message ID")
-    chat_data = chatData.query.filter_by(id_=data["chatid"]).first()
-    msgs = chat_data.chats
-    chat_data.chats = {}
+    msgs = {}
     if not update:
+        chat_data = chatData.query.filter_by(id_=data["chatid"]).first()
+        msgs = chat_data.chats
         msg_index = len(msgs)
-        msgs = {**msgs, **{msg_index: data["data"]}}
-        print(msg_index)
+        msgs[msg_index] = data["data"]
         chat_data.chats = msgs
+        flag_modified(chat_data, "chats")
+        db.session.merge(chat_data)
         db.session.commit()
         return msg_index
     else:
+        chat_data = chatData.query.filter_by(id_=data["chatid"]).first()
+        msgs = chat_data.chats
         msgid = data["msgid"]
         edit_ = msgs[msgid]
         edit_["read"] = data["update"]["read"]
         edit_["rstamp"] = data["update"]["rstamp"]
         msgs[msgid] = edit_
         chat_data.chats = msgs
+        flag_modified(chat_data, "chats")
+        db.session.merge(chat_data)
         db.session.commit()
         return True
     # pylint: enable=E1101

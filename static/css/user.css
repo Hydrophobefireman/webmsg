@@ -58,7 +58,7 @@ body {
     bottom: 0;
 }
 
-.chat_box input {
+.chat_inp {
     height: 30px;
     outline: none;
     border: 1px solid #e3e3e3;
@@ -148,6 +148,7 @@ body {
 .msg_sent {
     background-color: #9900ff;
     margin-left: auto;
+    text-align: right;
 }
 
 .msg_recieved {
@@ -156,6 +157,9 @@ body {
 }
 
 .msg {
+    margin: 5px;
+    width: -moz-fit-content;
+    width: fit-content;
     border-radius: 15px;
     max-width: 45%;
     display: block;
@@ -164,12 +168,62 @@ body {
     color: #fff;
     cursor: pointer;
     text-align: left;
-    word-break: break-word;
+    word-break: break-all;
 }
 
 .img-button-holder {
     display: inline-block;
     border: 1px solid #e3e3e3;
     border-radius: 50%;
+    background-color: #fff;
     box-shadow: 1px 1px 1px 1px #e3e3e3;
+}
+
+#message-info {
+    position: absolute;
+    height: 50%;
+    height: fit-content;
+    width: 45%;
+    top: 0;
+    margin: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: 0.4s ease-in-out;
+    word-break: break-all;
+    display: none;
+    background: #fff;
+    border: 2px solid #e3e3e3;
+    border-radius: 15px;
+}
+
+.message-info-key {
+    display: block;
+    user-select: none;
+    margin: auto;
+    cursor: pointer;
+    text-align: center;
+    padding: 5px;
+    border: 2px solid #e3e3e3;
+    border-radius: 10px;
+}
+
+.message-close {
+    user-select: none;
+    font-weight: bolder;
+    font-size: 19px;
+    cursor: pointer;
+}
+
+.message-info-value {
+    display: block;
+    margin: auto;
+    text-align: center;
+    padding: 0px;
+    height: 0;
+    opacity: 0;
+    transition: 0.3s ease-in-out;
+    border: 2px solid #e3e3e3;
+    border-radius: 10px;
+    font-weight: bold;
 }
