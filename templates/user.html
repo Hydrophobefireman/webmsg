@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="IE=edge" http-equiv="X-UA-Compatible" />
+    <title>
+        {{user}} - Profile
+    </title>
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <meta content="{{user}}" id="username_meta" />
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/cssmin/user.css">
+    <meta content="{{nonce}}" name="nonce" />
+</head>
+
+<body>
+    <div class="box-s">
+        <div class="main">
+            <div id="searchbox">
+                <div id="messages" style="height:20px;color: red;visibility:hidden">
+                </div>
+                <input class="input_n" id="users" placeholder="Search for a User" />
+                <button class="submit-button" id="sbm">
+                    Search
+                </button>
+                <div id="errmsgs">
+                </div>
+            </div>
+            <div class="results" id="res">
+                <div id="resbox-details" style="margin-top: 20px;">
+                    <img id="loading-gif" src="/static/loading.gif" style="height:20px;display: none;user-select: none;" />
+                </div>
+            </div>
+            <div id="results-all">
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/users.js">
+    </script>
+</body>
+
+</html>

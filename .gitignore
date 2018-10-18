@@ -32,6 +32,7 @@ js-player.obfs.js
 js-obfuscated.js
 *.obfuscated
 .obfuscated
+__usercache.json
 .cloudinary
 api.py
 *.cloudinary

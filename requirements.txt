@@ -1,10 +1,8 @@
-Flask==1.0.2
+passlib== 1.7.1
 requests==2.18.4
 beautifulsoup4==4.6.0
 django-htmlmin==0.10.0
-gunicorn==19.9.0
-gevent-websocket==0.10.1 
-Flask-Sockets==0.2.1
+Quart==0.6.7
 psycopg2-binary==2.7.5
 Flask_SQLAlchemy==2.3.2
 cloudinary==1.12.0
