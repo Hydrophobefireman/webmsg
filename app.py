@@ -105,7 +105,6 @@ def is_heroku(url):
     ) and "herokuapp" in parsedurl
 
 
-
 @app.route("/web/", strict_slashes=False)
 async def rtcs():
     return await render_template("rtc.html")

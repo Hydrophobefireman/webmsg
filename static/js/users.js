@@ -115,6 +115,8 @@
             console.log('Socket Opened')
         }
         ws.onclose = () => {
+            /* reconnect to the websocket When we begin caching the data...this wont create requests as well*/
+            create_chat_box(u)
             bod.innerHTML += "<br>Connection to server was lost. Please Reload the page"
         }
 
