@@ -14,6 +14,7 @@ import cloudinary.uploader
 import passlib.hash as pwhash
 import requests
 from bs4 import BeautifulSoup as bs
+from flask_tools import flaskUtils
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm.attributes import flag_modified
 from htmlmin.minify import html_minify
@@ -30,6 +31,8 @@ from quart import (
 )
 
 app = Quart(__name__)
+flaskUtils(app)
+
 app.secret_key = "GI4cEwO7e2g-Hc6jpo-StrXyRi_Qx8PTrCzzSfiR"
 dburl = os.environ.get("DATABASE_URL")
 try:
