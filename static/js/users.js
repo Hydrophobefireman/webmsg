@@ -207,19 +207,32 @@
                     const stamp_key = $.create("div"),
                         stamp_val = $.create("div");
                     $.set(sender_key, "class", "message-info-key");
+                    $.set(sender_key, "data-slide", "out")
                     $.set(sender_val, "class", "message-info-value");
                     $.set(read_key, "class", "message-info-key");
+                    $.set(read_key, "data-slide", "out")
                     $.set(read_val, "class", "message-info-value");
                     $.set(stamp_key, "class", "message-info-key");
+                    $.set(stamp_key, "data-slide", "out")
                     $.set(stamp_val, "class", "message-info-value");
+
+                    function slide_in_n_out(click, act_on) {
+                        if (click.getAttribute('data-slide') === 'out') {
+                            slideout(act_on);
+                            click.setAttribute("data-slide", "in")
+                        } else {
+                            click.setAttribute("data-slide", "out")
+                            slidein(act_on)
+                        }
+                    }
                     sender_key.onclick = () => {
-                        slideout(sender_val);
+                        slide_in_n_out(sender_key, sender_val)
                     }
                     read_key.onclick = () => {
-                        slideout(read_val);
+                        slide_in_n_out(read_key, read_val)
                     }
                     stamp_key.onclick = () => {
-                        slideout(stamp_val)
+                        slide_in_n_out(stamp_key, stamp_val)
                     }
                     sender_key.textContent = 'Sender';
                     sender_val.textContent = sender + (sender === HERE ? "(You)" : "");
