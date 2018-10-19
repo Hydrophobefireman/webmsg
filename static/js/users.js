@@ -251,8 +251,9 @@
         }
 
         async function check_page_cache(ws, user, parent_element) {
-            /* TODO: check indexed DB*/
+            /* TODO: STOP APP FROM CRASHING ON PRIVATE MODE(firefox and stuff)*/
             const data = await $get($.__chatID__);
+            console.log(data, "E")
             let obj;
             if (data) {
                 const len = Object.keys(data).length;
