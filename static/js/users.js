@@ -364,6 +364,9 @@
                 }
                 for (let i = 0; i < Object.keys(data).length; i++) {
                     const __msg__ = data[i];
+                    if (!__msg__) {
+                        continue
+                    }
                     __msg__.msgid = i;
                     parse_message(parent_element, __msg__);
                 }
