@@ -379,7 +379,7 @@ def upload(imgurl):
     if clapi_key is None:
         raise Exception("no key provided")
     cloudinary.config(
-        cloud_name="media-proxy", api_key=clapi_key, api_secret=clapi_secret
+        cloud_name="cdn-media-proxy", api_key=clapi_key, api_secret=clapi_secret
     )
     a = cloudinary.uploader.upload(imgurl)
     return a
