@@ -149,7 +149,10 @@
     }
 
     async function create_chat_box(u) {
-        var __id = await fetch("/api/chatid/", {
+        function get_curr_user() {
+            return u
+        };
+        const __id = await fetch("/api/chatid/", {
             method: "POST",
             credentials: "include",
             body: urlencode({
@@ -246,7 +249,7 @@
         }
         ws.onclose = () => {
             /* reconnect to the websocket When we begin caching the data...this wont create requests as well*/
-            create_chat_box(u)
+            create_chat_box(get_curr_user())
             bod.innerHTML += "<br>Connection to server was lost. Please Reload the page"
         }
 
@@ -267,8 +270,11 @@
                 }
                 for (let i = 0; i < len; i++) {
                     const __msg__ = data[i];
+                    if (!__msg__) {
+                        continue
+                    }
                     __msg__.msgid = i;
-                    console.log("Parsing msgid " + i + "from cache")
+                    console.log(`Parsing msgid ${i}from cache`)
                     parse_message(parent_element, __msg__);
                 }
                 ws.send(JSON.stringify(obj));
