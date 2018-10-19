@@ -208,6 +208,7 @@ body {
     padding: 5px;
     border: 2px solid #e3e3e3;
     border-radius: 10px;
+    transition: 0.3s ease-in-out;
 }
 
 .message-close {
