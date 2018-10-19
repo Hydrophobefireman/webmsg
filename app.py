@@ -10,9 +10,7 @@ import cloudinary.uploader
 import passlib.hash as pwhash
 import requests
 from bs4 import BeautifulSoup as bs
-from flask_tools import flaskUtils
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm.attributes import flag_modified
 from htmlmin.minify import html_minify
 from quart import (
     Quart,
@@ -25,6 +23,9 @@ from quart import (
     session,
     websocket,
 )
+from sqlalchemy.orm.attributes import flag_modified
+
+from flask_tools import flaskUtils
 
 app = Quart(__name__)
 flaskUtils(app)
@@ -77,7 +78,7 @@ class userData(db.Model):
         self.pw_hash = pw
 
     def __repr__(self):
-        return "USER:%r" % self.user
+        return "<USER:%r>" % self.user
 
 
 class User(object):
@@ -99,11 +100,6 @@ def is_heroku(url):
         or "localhost" not in parsedurl
         or "192.168." not in parsedurl
     ) and "herokuapp" in parsedurl
-
-
-@app.route("/web/", strict_slashes=False)
-async def rtcs():
-    return await render_template("rtc.html")
 
 
 app.__connectedSockets__ = set()
@@ -180,6 +176,7 @@ async def messenger():
                 read = message.get("read")
                 stamp = validate_stamp(message.get("stamp"))
                 media = message.get("media")
+                _from = message.get("fetch_from")
                 chat_data = None
                 chat_data_args = (session["user"], user, is_heroku(ws.url))
                 _connected_ = [s for s in users if s.idxs == user]
@@ -192,7 +189,9 @@ async def messenger():
                     )
                     chat = create_chat_data(session["user"], user)
                 else:
-                    print(f"Using Existing Chat with id:{chat.id_}")
+                    print(
+                        f"Using Existing Chat with id:{chat.id_};Participants:{session['user']}<=>{user}"
+                    )
                 chat_id = chat.id_
                 if istyping:
                     rec_user = _connected_[0] if _connected_ else None
@@ -224,11 +223,29 @@ async def messenger():
                     if rec_user:
                         await rec_user.send(to_send)
                 elif fetch:
-                    await ws.send(
-                        json.dumps(
-                            {"data": check_chat_data(id_=chat_id).chats, "fetch": True}
+                    if not _from:
+                        await ws.send(
+                            json.dumps(
+                                {
+                                    "data": check_chat_data(id_=chat_id).chats,
+                                    "fetch": True,
+                                    "full_fetch": True,
+                                }
+                            )
                         )
-                    )
+                    else:
+                        _data = check_chat_data(id_=chat_id).chats
+                        tsend = get_data_from(_data, _from)
+                        await ws.send(
+                            json.dumps(
+                                {
+                                    "data": tsend,
+                                    "full_fetch": False,
+                                    "fetch": True,
+                                    "fetched_from": _from + 1,
+                                }
+                            )
+                        )
                 elif read and read.get("user") != session["user"]:
                     data = read
                     msgs = chat.chats
@@ -278,6 +295,29 @@ async def messenger():
             raise (e)
 
 
+def get_data_from(_dict, _from):
+    mark = None
+    tr = {}
+    if not isinstance(_from, (str, int)):
+        print("Bad Type")
+        return {}
+    elif isinstance(_from, str):
+        if not _from.isnumeric():
+            print("not a number")
+            return {}
+        mark = int(_from) + 1
+    else:
+        mark = _from + 1
+    while 1:
+        data = _dict.get(mark)
+        if data:
+            tr[mark] = data
+            mark += 1
+        else:
+            break
+    return tr
+
+
 def alter_chat_data(data, update=False):
     # pylint: disable=E1101
     if update and data.get("msgid") is None:
@@ -307,6 +347,22 @@ def alter_chat_data(data, update=False):
         db.session.commit()
         return True
     # pylint: enable=E1101
+
+
+@app.route("/api/chatid/", methods=["POST"])
+async def get_chat_id():
+    form = await request.form
+    if not session.get("logged_in") or not session.get("user"):
+        return "", 403
+    elif not form.get("side_a") and not form.get("side_b"):
+        return "", 500
+    elif session["user"] != form.get("side_a"):
+        return "Invalid Request", 500
+    data = check_chat_data(form["side_a"], form["side_b"])
+    if not data:
+        return "", 403
+    else:
+        return data.id_
 
 
 def check_chat_data(
@@ -345,6 +401,11 @@ def check_chat_data(
 def create_chat_data(u1: str, u2: str) -> bool:
     n1, n2 = sorted((u1, u2))
     data = chatData(u1=n1, u2=n2)
+    if (
+        not userData.query.filter_by(user=n1).first()
+        or not userData.query.filter_by(user=n2).first()
+    ):
+        raise RuntimeError("Cannot create chat between Non Existent users")
     # pylint: disable=E1101
     db.session.add(data)
     db.session.commit()

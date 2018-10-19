@@ -12,7 +12,8 @@ html {
 }
 
 body {
-    width: 100%
+    width: 100%;
+    font-family: 'Open Sans', sans-serif;
 }
 
 #chat_wrap {

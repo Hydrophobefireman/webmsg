@@ -35,7 +35,135 @@
         }
     });
 
-    function create_chat_box(u) {
+    function make_msg_info(_self) {
+        const dataset = _self.dataset,
+            sender = dataset.sender,
+            stamp = parseInt(dataset.stamp),
+            read = dataset.read,
+            rstamp = parseInt(dataset.rstamp),
+            media = dataset.media;
+        const __par = $.id("message-info");
+        __par.innerHTML = '';
+        __par.style.opacity = '1';
+        const close_this = $.create("div");
+        $.set(close_this, 'class', "message-close");
+        close_this.innerHTML = "Close"
+        const $par_const = $.create("div");
+        $par_const.style.transition = '0.3s ease-in-out';
+        __par.appendChild(close_this);
+        __par.appendChild($par_const);
+        close_this.onclick = () => {
+            $par_const.style.opacity = '0';
+            $par_const.style.height = '0px';
+            __par.style.opacity = '0';
+            __par.innerHTML = ""
+        }
+        const sender_key = $.create("div"),
+            sender_val = $.create("div");
+        const read_key = $.create("div"),
+            read_val = $.create("div");
+        const stamp_key = $.create("div"),
+            stamp_val = $.create("div");
+        $.set(sender_key, "class", "message-info-key");
+        $.set(sender_key, "data-slide", "out")
+        $.set(sender_val, "class", "message-info-value");
+        $.set(read_key, "class", "message-info-key");
+        $.set(read_key, "data-slide", "out")
+        $.set(read_val, "class", "message-info-value");
+        $.set(stamp_key, "class", "message-info-key");
+        $.set(stamp_key, "data-slide", "out")
+        $.set(stamp_val, "class", "message-info-value");
+
+        sender_key.onclick = () => {
+            slideout(sender_val);
+            slidein(sender_key);
+        }
+        sender_val.onclick = () => {
+            slideout(sender_key);
+            slidein(sender_val);
+        }
+        read_key.onclick = () => {
+            slideout(read_val);
+            slidein(read_key);
+        }
+        read_val.onclick = () => {
+            slideout(read_key);
+            slidein(read_val);
+        }
+        stamp_key.onclick = () => {
+            slideout(stamp_val);
+            slidein(stamp_key);
+        }
+        stamp_val.onclick = () => {
+            slideout(stamp_key);
+            slidein(stamp_val);
+        }
+        sender_key.textContent = 'Sender';
+        sender_val.textContent = sender + (sender === HERE ? "(You)" : "");
+        stamp_key.textContent = 'Time';
+        stamp_val.textContent = new Date(stamp).toLocaleString();
+        read_key.textContent = 'Read-Status';
+        read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? new Date(rstamp).toLocaleString() : "N/A"})` : "Sent";
+        if (sender !== HERE) {
+            read_key.style.display = 'none';
+            read_val.style.display = 'none'
+        }
+        if (media !== "null") {
+            const media_key = $.create("div"),
+                media_val = $.create("div");
+            $.set(media_key, "class", "message-info-key");
+            $.set(media_val, "class", "message-info-value");
+            media_key.textContent = "Media Message";
+            media_val.innerHTML = "Click To Open Media Preview";
+            media_val.style.cursor = 'pointer'
+            $.set(media_val, "data-media", media)
+            slideout(media_val)
+            media_val.onclick = () => {
+                const val = media_val.dataset;
+                const img = new Image;
+                img.src = val.media;
+                $par_const.innerHTML = '';
+                const i = $.create("a");
+                $par_const.appendChild(img);
+                $par_const.appendChild(i);
+                i.style.color = 'black';
+                i.style.textDecoration = 'none';
+                i.target = "__blank";
+                i.style.display = 'block';
+                i.innerHTML = 'Click To Open Image In A New Tab';
+                i.href = val.media
+                img.style.width = '160px';
+                img.style.height = '100px';
+            }
+            $par_const.appendChild(media_key);
+            $par_const.appendChild(media_val);
+        }
+        __par.style.display = 'block';
+        $par_const.appendChild(sender_key);
+        $par_const.appendChild(sender_val);
+        $par_const.appendChild(stamp_key);
+        $par_const.appendChild(stamp_val);
+        $par_const.appendChild(read_key);
+        $par_const.appendChild(read_val);
+        console.log(dataset);
+    }
+
+    async function create_chat_box(u) {
+        var __id = await fetch("/api/chatid/", {
+            method: "POST",
+            credentials: "include",
+            body: urlencode({
+                side_a: HERE,
+                side_b: u
+            }),
+            headers: {
+                "content-type": "application/x-www-form-urlencoded"
+            },
+        });
+        if (__id.status !== 200) {
+            return document.body.innerHTML = 'An error Occured..please reload the page'
+        }
+        $.__chatID__ = await __id.text();
         results_all.innerHTML = "";
         swindow.style.display = 'none';
         searchbox.style.display = 'none';
@@ -113,7 +241,7 @@
             }
         }
         ws.onopen = () => {
-            check_page_cache(ws, u);
+            check_page_cache(ws, u, bod);
             console.log('Socket Opened')
         }
         ws.onclose = () => {
@@ -122,20 +250,43 @@
             bod.innerHTML += "<br>Connection to server was lost. Please Reload the page"
         }
 
-        function check_page_cache(ws, user) {
+        async function check_page_cache(ws, user, parent_element) {
             /* TODO: check indexed DB*/
-            const obj = {
-                stamp: new Date().getTime(),
-                message: null,
-                user,
-                fetch_messages: true
-            };
-            ws.send(JSON.stringify(obj))
-            return ws
+            const data = await $get($.__chatID__);
+            let obj;
+            if (data) {
+                const len = Object.keys(data).length;
+                console.log("Checking For Updated Data")
+                obj = {
+                    stamp: new Date().getTime(),
+                    message: null,
+                    user,
+                    fetch_messages: true,
+                    fetch_from: len - 1
+                }
+                for (let i = 0; i < len; i++) {
+                    const __msg__ = data[i];
+                    __msg__.msgid = i;
+                    console.log("Parsing msgid " + i + "from cache")
+                    parse_message(parent_element, __msg__);
+                }
+                ws.send(JSON.stringify(obj));
+                return !0
+            } else {
+                console.log("Fetching New")
+                obj = {
+                    stamp: new Date().getTime(),
+                    message: null,
+                    user,
+                    fetch_messages: true
+                };
+                ws.send(JSON.stringify(obj))
+                return !0
+            }
         }
 
         function parse_message(parent_element, js) {
-            function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp, media = null) {
+            async function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp, media = null) {
                 let msg_class;
                 const msg = $.create("div");
                 if (sender === HERE) {
@@ -158,24 +309,6 @@
                     msg.textContent = message;
                 }
 
-                function slidein(el) {
-                    el.style.overflow = 'hidden'
-                    el.style.padding = '0px';
-                    el.style.opacity = 0;
-                    el.style.height = '0'
-                    el.style.border = 'none';
-                    el.style.width = '0';
-                }
-
-                function slideout(el) {
-                    el.style.padding = '5px';
-                    el.style.opacity = 1;
-                    el.style.height = 'auto';
-                    el.style.width = 'auto';
-                    el.style.border = "2px solid #e3e3e3";
-                    el.style.overflow = 'visible'
-
-                }
                 $.set(msg, "data-sender", sender);
                 $.set(msg, "data-receiver", receiver);
                 $.set(msg, "data-stamp", stamp);
@@ -185,125 +318,31 @@
                 box.appendChild(msg);
                 box.scrollTop = box.scrollHeight;
                 msg.onclick = function () {
-                    const dataset = this.dataset,
-                        sender = dataset.sender,
-                        receiver = dataset.receiver,
-                        stamp = parseInt(dataset.stamp),
-                        msgid = dataset.msgid,
-                        read = dataset.read,
-                        rstamp = parseInt(dataset.rstamp),
-                        media = dataset.media;
-                    const __par = $.id("message-info");
-                    __par.innerHTML = '';
-                    __par.style.opacity = '1';
-                    const close_this = $.create("div");
-                    $.set(close_this, 'class', "message-close");
-                    close_this.innerHTML = "Close"
-                    const $par_const = $.create("div");
-                    $par_const.style.transition = '0.3s ease-in-out';
-                    __par.appendChild(close_this);
-                    __par.appendChild($par_const);
-                    close_this.onclick = () => {
-                        $par_const.style.opacity = '0';
-                        $par_const.style.height = '0px';
-                        __par.style.opacity = '0';
-                        __par.innerHTML = ""
-                    }
-                    const sender_key = $.create("div"),
-                        sender_val = $.create("div");
-                    const read_key = $.create("div"),
-                        read_val = $.create("div");
-                    const stamp_key = $.create("div"),
-                        stamp_val = $.create("div");
-                    $.set(sender_key, "class", "message-info-key");
-                    $.set(sender_key, "data-slide", "out")
-                    $.set(sender_val, "class", "message-info-value");
-                    $.set(read_key, "class", "message-info-key");
-                    $.set(read_key, "data-slide", "out")
-                    $.set(read_val, "class", "message-info-value");
-                    $.set(stamp_key, "class", "message-info-key");
-                    $.set(stamp_key, "data-slide", "out")
-                    $.set(stamp_val, "class", "message-info-value");
-
-                    function slide_in_n_out(click, act_on) {
-                        if (click.getAttribute('data-slide') === 'out') {
-                            slideout(act_on);
-                            click.setAttribute("data-slide", "in")
-                        } else {
-                            click.setAttribute("data-slide", "out")
-                            slidein(act_on)
-                        }
-                    }
-                    sender_key.onclick = () => {
-                        slideout(sender_val);
-                        slidein(sender_key);
-                    }
-                    sender_val.onclick = () => {
-                        slideout(sender_key);
-                        slidein(sender_val);
-                    }
-                    read_key.onclick = () => {
-                        slideout(read_val);
-                        slidein(read_key);
-                    }
-                    read_val.onclick = () => {
-                        slideout(read_key);
-                        slidein(read_val);
-                    }
-                    stamp_key.onclick = () => {
-                        slideout(stamp_val);
-                        slidein(stamp_key);
-                    }
-                    stamp_val.onclick = () => {
-                        slideout(stamp_key);
-                        slidein(stamp_val);
-                    }
-                    sender_key.textContent = 'Sender';
-                    sender_val.textContent = sender + (sender === HERE ? "(You)" : "");
-                    stamp_key.textContent = 'Time';
-                    stamp_val.textContent = new Date(stamp).toLocaleString();
-                    read_key.textContent = 'Read-Status';
-                    read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? new Date(rstamp).toLocaleString() : "N/A"})` : "Sent";
-                    if (media !== "null") {
-                        const media_key = $.create("div"),
-                            media_val = $.create("div");
-                        $.set(media_key, "class", "message-info-key");
-                        $.set(media_val, "class", "message-info-value");
-                        media_key.textContent = "Media Message";
-                        media_val.innerHTML = "Click To Open Media Preview";
-                        media_val.style.cursor = 'pointer'
-                        $.set(media_val, "data-media", media)
-                        slideout(media_val)
-                        media_val.onclick = () => {
-                            const val = media_val.dataset;
-                            const img = new Image;
-                            img.src = val.media;
-                            $par_const.innerHTML = '';
-                            const i = $.create("a");
-                            $par_const.appendChild(img);
-                            $par_const.appendChild(i);
-                            i.style.color = 'black';
-                            i.style.textDecoration = 'none';
-                            i.target = "__blank";
-                            i.style.display = 'block';
-                            i.innerHTML = 'Click To Open Image In A New Tab';
-                            i.href = val.media
-                            img.style.width = '160px';
-                            img.style.height = '100px';
-                        }
-                        $par_const.appendChild(media_key);
-                        $par_const.appendChild(media_val);
-                    }
-                    __par.style.display = 'block';
-                    $par_const.appendChild(sender_key);
-                    $par_const.appendChild(sender_val);
-                    $par_const.appendChild(stamp_key);
-                    $par_const.appendChild(stamp_val);
-                    $par_const.appendChild(read_key);
-                    $par_const.appendChild(read_val);
-                    console.log(dataset);
+                    make_msg_info(this)
                 }
-            }
+                let data;
+                data = await $get($.__chatID__);
+                if (data) {
+                    console.log("Cache HIT")
+                    if (!data[msgid]) {
+                        console.log("[indexedDB]Adding new entry:", msgid)
+                        /*never added to indexedDB..i.e new Message*/
+                        data[msgid] = {
+                            message,
+                            sender,
+                            stamp,
+                            read,
+                            media: (!!media ? true : null),
+                            mediaURL: media,
+                            rstamp,
+                            receiver
+                        };
+                        await $set($.__chatID__, data)
+                    }
+                } else {
+                    console.log("[indexedDB]Cache MISS")
+                }
+            };
             if (js.typing) {
                 //if the user is typing..we dont need to create any element
                 return $user.style.color = 'green'
@@ -312,6 +351,10 @@
             if (js.fetch) {
                 console.log("FETCHED DETAILS")
                 const data = js.data;
+                if (js.full_fetch) {
+                    console.log("[indexedDB]Setting Full Cache to indexedDB:", data)
+                    $set($.__chatID__, data);
+                }
                 for (let i = 0; i < Object.keys(data).length; i++) {
                     const __msg__ = data[i];
                     __msg__.msgid = i;
@@ -500,5 +543,23 @@
         const dataurl = canvas.toDataURL(mime_type, quality / 100);
         const res = await fetch(dataurl);
         return await res.arrayBuffer();
+    }
+
+    function slidein(el) {
+        el.style.overflow = 'hidden'
+        el.style.padding = '0px';
+        el.style.opacity = 0;
+        el.style.height = '0'
+        el.style.border = 'none';
+        el.style.width = '0';
+    }
+
+    function slideout(el) {
+        el.style.padding = '5px';
+        el.style.opacity = 1;
+        el.style.height = 'auto';
+        el.style.width = 'auto';
+        el.style.border = "2px solid #e3e3e3";
+        el.style.overflow = 'visible'
     }
 })()

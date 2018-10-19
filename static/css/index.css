@@ -62,3 +62,7 @@
     height: 20px;
     padding: 8px;
 }
+
+body {
+    font-family: 'Open Sans', sans-serif;
+}
