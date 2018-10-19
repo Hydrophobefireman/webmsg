@@ -235,13 +235,28 @@
                         }
                     }
                     sender_key.onclick = () => {
-                        slide_in_n_out(sender_key, sender_val)
+                        slideout(sender_val);
+                        slidein(sender_key);
+                    }
+                    sender_val.onclick = () => {
+                        slideout(sender_key);
+                        slidein(sender_val);
                     }
                     read_key.onclick = () => {
-                        slide_in_n_out(read_key, read_val)
+                        slideout(read_val);
+                        slidein(read_key);
+                    }
+                    read_val.onclick = () => {
+                        slideout(read_key);
+                        slidein(read_val);
                     }
                     stamp_key.onclick = () => {
-                        slide_in_n_out(stamp_key, stamp_val)
+                        slideout(stamp_val);
+                        slidein(stamp_key);
+                    }
+                    stamp_val.onclick = () => {
+                        slideout(stamp_key);
+                        slidein(stamp_val);
                     }
                     sender_key.textContent = 'Sender';
                     sender_val.textContent = sender + (sender === HERE ? "(You)" : "");

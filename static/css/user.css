@@ -196,11 +196,11 @@ body {
     background: #fff;
     border: 2px solid #e3e3e3;
     border-radius: 15px;
+    overflow: hidden;
 }
 
 .message-info-key {
     display: block;
-    z-index: 10;
     user-select: none;
     margin: auto;
     cursor: pointer;
@@ -224,8 +224,11 @@ body {
     text-align: center;
     padding: 0px;
     height: 0;
+    cursor: pointer;
+    user-select: none;
     opacity: 0;
     transition: 0.3s ease-in-out;
     border-radius: 10px;
     font-weight: bold;
+    width: 0;
 }
