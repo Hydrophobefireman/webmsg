@@ -239,7 +239,7 @@
                 }
                 parse_message(bod, js);
             } catch (e) {
-                console.log(e, "ERR");
+                console.log(e, "ERROR in parsing message");
                 bod.innerHTML += '<br>An error occured Please reload the page'
             }
         }
@@ -256,7 +256,6 @@
         async function check_page_cache(ws, user, parent_element) {
             /* TODO: STOP APP FROM CRASHING ON PRIVATE MODE(firefox and stuff)*/
             const data = await $get($.__chatID__);
-            console.log(data, "E")
             let obj;
             if (data) {
                 const len = Object.keys(data).length;
@@ -270,12 +269,12 @@
                 }
                 for (let i = 0; i < len; i++) {
                     const __msg__ = data[i];
-                    if (!__msg__) {
-                        continue
+                    if (__msg__) {
+                        __msg__.msgid = i;
+                        console.log(`Parsing msgid: ${i} from cache`)
+                        parse_message(parent_element, __msg__);
                     }
-                    __msg__.msgid = i;
-                    console.log(`Parsing msgid ${i}from cache`)
-                    parse_message(parent_element, __msg__);
+
                 }
                 ws.send(JSON.stringify(obj));
                 return !0
@@ -292,7 +291,7 @@
             }
         }
 
-        function parse_message(parent_element, js) {
+        async function parse_message(parent_element, js) {
             async function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp, media = null) {
                 let msg_class;
                 const msg = $.create("div");
@@ -360,15 +359,26 @@
                 const data = js.data;
                 if (js.full_fetch) {
                     console.log("[indexedDB]Setting Full Cache to indexedDB:", data)
-                    $set($.__chatID__, data);
+                    await $set($.__chatID__, data);
+                } else {
+                    const __ = await $get($.__chatID__);
+                    const new_data = Object.assign({}, __, data);
+                    await $set($.__chatID__, new_data);
                 }
+                const j = js.fetched_from;
                 for (let i = 0; i < Object.keys(data).length; i++) {
-                    const __msg__ = data[i];
-                    if (!__msg__) {
-                        continue
+                    let d;
+                    if (!isNaN(j)) {
+                        d = i + j;
+                    } else {
+                        d = i
                     }
-                    __msg__.msgid = i;
-                    parse_message(parent_element, __msg__);
+                    const __msg__ = data[d];
+                    if (__msg__) {
+                        __msg__.msgid = d;
+                        parse_message(parent_element, __msg__);
+                    }
+
                 }
             }
             let text, sender, receiver, stamp, read, rstamp, msgid;
