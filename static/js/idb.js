@@ -9,7 +9,7 @@
                 this._dbase = new Promise((resolve, reject) => {
                     const request = indexedDB.open(DataBase, 1);
                     request.onerror = () => {
-                        reject(request.error)
+                        resolve(null)
                     };
                     request.onsuccess = () => {
                         resolve(request.result)
@@ -25,7 +25,7 @@
                     transaction.oncomplete = () => resolve();
                     transaction.onabort = transaction.onerror = () => reject();
                     cb(transaction.objectStore(this.storeName));
-                }));
+                })).catch(e => null);
             }
         }
         let store;
@@ -36,22 +36,39 @@
             let req;
             return store.__IDBAct__("readonly", dat => {
                 req = dat.get(key)
-            }).then(() => req.result)
+            }).then(() => req.result).catch(e => null)
         }
 
-        window.$set = (key, val, store = __defaultStore__()) => store.__IDBAct__("readwrite", dat => {
-            dat.put(val, key)
-        })
+        window.$set = (key, val, store = __defaultStore__()) => {
+            try {
+                return store.__IDBAct__("readwrite", dat => {
+                    dat.put(val, key)
+                })
+            } catch (e) {
+                return null
+            }
+        }
 
-        window.$del = (key, store = __defaultStore__()) => store.__IDBAct__("readwrite", dat => {
-            dat.delete(key)
-        })
+        window.$del = (key, store = __defaultStore__()) => {
+            try {
+                store.__IDBAct__("readwrite", dat => {
+                    dat.delete(key)
+                })
+            } catch (e) {
+                return null;
+            }
+        }
 
         window.$__clear__ = (store = __defaultStore__()) => {
-            console.warn("clearing Store:", store);
-            return store.__IDBAct__("readwrite", dat => {
-                dat.clear()
-            })
+            try {
+                console.warn("clearing Store:", store);
+                return store.__IDBAct__("readwrite", dat => {
+                    dat.clear()
+                })
+            } catch (e) {
+                return e
+            }
+
         }
 
         window.$keys = (store = __defaultStore__()) => {
@@ -65,7 +82,7 @@
                     keys.push(this.result.key);
                     this.result.continue();
                 };
-            }).then(() => keys);
+            }).then(() => keys).catch(e => null);
         }
     }
 }))()
