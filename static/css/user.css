@@ -168,7 +168,8 @@ body {
     color: #fff;
     cursor: pointer;
     text-align: left;
-    word-break: break-all;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .img-button-holder {
@@ -199,6 +200,7 @@ body {
 
 .message-info-key {
     display: block;
+    z-index: 10;
     user-select: none;
     margin: auto;
     cursor: pointer;
@@ -218,12 +220,12 @@ body {
 .message-info-value {
     display: block;
     margin: auto;
+    border: none;
     text-align: center;
     padding: 0px;
     height: 0;
     opacity: 0;
     transition: 0.3s ease-in-out;
-    border: 2px solid #e3e3e3;
     border-radius: 10px;
     font-weight: bold;
 }

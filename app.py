@@ -1,12 +1,8 @@
-import base64
-import html
 import json
 import os
-import random
 import re
 import secrets
 import time
-import uuid
 from functools import wraps
 from urllib.parse import urlparse
 
@@ -528,6 +524,8 @@ async def userpages(user):
         return html_minify(
             await render_template("user.html", nonce=session["u-id"], user=user)
         )
+    else:
+        return redirect(f"/u/{session['user']}")
     return html_minify(
         await render_template("chat.html", nonce=session["u-id"], user=user)
     )

@@ -82,6 +82,8 @@
         boxwrap.appendChild(box);
         results_all.appendChild(boxwrap);
         close.onclick = () => {
+            $.id("message-info").innerHTML = '';
+            $.id("message-info").style.opacity = '0.0'
             results_all.innerHTML = '';
             results_all.style.display = 'none';
             searchbox.style.display = 'block';
@@ -156,16 +158,23 @@
                     msg.textContent = message;
                 }
 
-                function slidein(el) {;
+                function slidein(el) {
+                    el.style.overflow = 'hidden'
                     el.style.padding = '0px';
                     el.style.opacity = 0;
                     el.style.height = '0'
+                    el.style.border = 'none';
+                    el.style.width = '0';
                 }
 
                 function slideout(el) {
                     el.style.padding = '5px';
                     el.style.opacity = 1;
                     el.style.height = 'auto';
+                    el.style.width = 'auto';
+                    el.style.border = "2px solid #e3e3e3";
+                    el.style.overflow = 'visible'
+
                 }
                 $.set(msg, "data-sender", sender);
                 $.set(msg, "data-receiver", receiver);
