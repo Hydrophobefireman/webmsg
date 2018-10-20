@@ -1,11 +1,10 @@
 import json
 import os
 
-import firebase_admin
-from firebase_admin import credentials, storage
-from secrets import token_urlsafe
-
-from io import BytesIO
+import requests
+import psycopg2
+from flask_sqlalchemy import SQLAlchemy
+from firebase_admin import credentials
 
 
 def open_and_read(fn: str, mode: str = "r", strip: bool = True):
@@ -37,22 +36,31 @@ if not data:
 else:
     cred_ = json.loads(data)
 cred = credentials.Certificate(cred_)
-firebase_admin.initialize_app(cred, {"storageBucket": "webmsg-py.appspot.com"})
-bucket = storage.bucket()
+
+URL = "https://fcm.googleapis.com/v1/projects/webmsg-py/messages:send"
 
 
-def upload_blob(filename_or_bytes, type_):
-    blobn = token_urlsafe(25)
-    blob = bucket.blob(blobn)
-    if isinstance(filename_or_bytes, str) and os.path.isfile(filename_or_bytes):
-        meth = getattr(blob, "upload_from_filename")
-    elif isinstance(filename_or_bytes, bytes):
-        filename_or_bytes = BytesIO(filename_or_bytes)
-        meth = getattr(blob, "upload_from_file")
-    else:
-        raise TypeError("File does not exist or incorrect type of argument provided")
-    meth(filename_or_bytes)
-    blob.make_public()
-    blob.content_type = type_
-    blob.update()
-    return blob.public_url
+def _get_new_access_token():
+    return cred.get_access_token()
+
+
+def notify(user, data, db):
+    userdata = db.query.filter_by(user=user).first()
+    if not userdata:
+        return None
+    if not userdata.notification_id:
+        return None
+    idx = userdata.notification_id
+    headers = {
+        "Authorization": f"Bearer {_get_new_access_token().access_token}",
+        "content-type": "application/json",
+    }
+    data_fs = {
+        "message": {
+            "token": idx,
+            "webpush": {"headers": {"Urgency": "high"}, "data": data},
+        }
+    }
+    req = requests.post(URL, headers=headers, data=json.dumps(data_fs))
+    print(req.text)
+    return req.text

@@ -1,6 +1,30 @@
 (async () => {
+    const messaging = firebase.messaging();
+    const websocket_url = `${(window.location.protocol === 'https:' ? "wss://" : "ws://") +
+    window.location.host}/@/messenger/`;
+    await messaging.requestPermission();
+    messaging.usePublicVapidKey(
+        "BGhv7XYjPBkpVoOEPbq2E19Is1ti_MYfboTDazKE0jgxPENxDqe0-U2p1OKEEgG4JH4Ycl8Wbxdv-UrrP_LcLmw");
+    // Callback fired if Instance ID token is updated.
+    await messaging.getToken();
+    const token_stuff = async () => {
+        const token = await messaging.getToken();
+        console.log('Token refreshed.');
+        console.log(token);
+        await fetch("/@/notify/", {
+            method: "post",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded"
+            },
+            body: `token=${encodeURIComponent(token)}`
+        })
+    };
+    await token_stuff()
+    messaging.onTokenRefresh(token_stuff);
+
     (new Image).src = "/static/attachment.svg";
     (new Image).src = "/static/close.svg"
+    let getCurrUser;
     const $ = {
             id: (_id) => {
                 return document.getElementById(_id)
@@ -148,10 +172,103 @@
         console.log(dataset);
     }
 
-    async function create_chat_box(u) {
-        function get_curr_user() {
-            return u
+    function createUiForNotification(_data, wsContext = new WebSocket(websocket_url)) {
+        const box = $.create("div");
+        const senderName = $.create("div");
+        const messageContent = $.create("div");
+        const actionBox = $.create("div");
+        const replyBtn = $.create("span");
+        const markAsRead = $.create("span");
+        const reply_inp = $.create("input");
+        const sender = _data.sender;
+        const text = _data.messageContent;
+        const isMedia = _data.hasImage;
+        $.set(reply_inp, "class", "notification-reply-bar");
+        $.set(box, "class", "notification-box");
+        $.set(senderName, "class", "notification-sender");
+        $.set(messageContent, "class", "notification-text");
+        $.set(actionBox, "class", "notification-action-box");
+        $.set(replyBtn, "class", "notification-action-button");
+        $.set(markAsRead, "class", "notification-action-button");
+        box.appendChild(senderName);
+        box.appendChild(messageContent);
+        box.appendChild(actionBox);
+        actionBox.appendChild(replyBtn);
+        actionBox.appendChild(markAsRead);
+        senderName.textContent = sender;
+        replyBtn.textContent = `Reply To ${sender}`;
+        markAsRead.textContent = "Mark As Read";
+        if (isMedia) {
+            const img = new Image;
+            img.src = "/static/attachment.svg";
+            messageContent.innerHTML = "";
+            messageContent.appendChild(img);
+        } else {
+            messageContent.textContent = text;
+        }
+        document.body.appendChild(box);
+        let timer;
+        replyBtn.onclick = () => {
+            clearTimeout(timer)
+            replyBtn.replaceWith(reply_inp);
+            reply_inp.onkeydown = evt => {
+                if (evt.keyCode === 13) {
+                    if (reply_inp.value.replace(/\s/g, "").length > 0) {
+                        const stamp = new Date().getTime();
+                        const value = reply_inp.value;
+                        const data = {
+                            user: sender,
+                            message: value,
+                            typing: false,
+                            media: null,
+                            stamp
+                        };
+                        wsContext.send(JSON.stringify(data))
+                        reply_inp.value = '';
+                        box.remove()
+                    }
+                }
+            };
         };
+        markAsRead.onclick = () => {
+            const _read = {
+                user: sender,
+                message: null,
+                read: {
+                    id: _data.msgid
+                },
+                stamp: new Date().getTime(),
+                rstamp: new Date().getTime(),
+            };
+            wsContext.send(JSON.stringify(_read));
+            box.remove()
+        }
+        messageContent.onclick = senderName.onclick = () => {
+            create_chat_box(sender);
+        };
+        setTimeout(() => {
+            box.style.marginTop = '15px';
+            timer = setTimeout(() => {
+                box.remove();
+            }, 4000);
+        }, 500);
+    };
+    if (Notification.permission === "granted") {
+        console.log("Granted Notification Perm")
+        messaging.onMessage(payload => {
+            const data = payload.data;
+            console.log("Creating Notification UI")
+            if (typeof getCurrUser === "function") {
+                if (data.sender !== getCurrUser()) {
+                    createUiForNotification(data);
+                }
+            } else {
+                createUiForNotification(data);
+            }
+        });
+    }
+    async function create_chat_box(u) {
+        getCurrUser = () => u;
         const __id = await fetch("/api/chatid/", {
             method: "POST",
             credentials: "include",
@@ -226,8 +343,6 @@
         attach.src = "/static/attachment.svg";
         close.style.cursor = 'pointer';
         attach.style.cursor = 'pointer';
-        const websocket_url = `${(window.location.protocol === 'https:' ? "wss://" : "ws://") +
-        window.location.host}/@/messenger/`;
         const ws = new WebSocket(websocket_url);
         ws.onmessage = e => {
             const msg = e.data;
@@ -249,7 +364,7 @@
         }
         ws.onclose = () => {
             /* reconnect to the websocket When we begin caching the data...this wont create requests as well*/
-            create_chat_box(get_curr_user())
+            create_chat_box(getCurrUser())
             bod.innerHTML += "<br>Connection to server was lost. Please Reload the page"
         }
 
@@ -472,7 +587,7 @@
         }
         txtbox.onkeydown = function (e) {
             if (e.keyCode === 13) {
-                if (txtbox.value.replace(/\s/g, "").length > 0) {
+                if (this.value.replace(/\s/g, "").length > 0) {
                     const stamp = new Date().getTime();
                     const value = txtbox.value;
                     const data = {
@@ -582,4 +697,5 @@
         el.style.border = "2px solid #e3e3e3";
         el.style.overflow = 'visible'
     }
+
 })()

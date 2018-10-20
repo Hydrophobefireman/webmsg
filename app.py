@@ -25,7 +25,7 @@ from quart import (
     websocket,
 )
 from sqlalchemy.orm.attributes import flag_modified
-
+from notificationmanager import notify
 from flask_tools import flaskUtils
 
 app = Quart(__name__)
@@ -72,11 +72,13 @@ class userData(db.Model):
     # pylint: disable=E1101
     user = db.Column(db.String, primary_key=True)
     pw_hash = db.Column(db.String(1000))
+    notification_id = db.Column(db.String(1000))
     # pylint: enable=E1101
 
-    def __init__(self, u, pw):
+    def __init__(self, u, pw, n=""):
         self.user = u
         self.pw_hash = pw
+        self.notification_id = n
 
     def __repr__(self):
         return "<USER:%r>" % self.user
@@ -104,6 +106,28 @@ def is_heroku(url):
 
 
 app.__connectedSockets__ = set()
+
+
+@app.route("/@/notify/", methods=["POST"])
+async def set_user_token():
+    form = await request.form
+    if not session.get("logged_in") or not session.get("user") or not form.get("token"):
+        return "NO"
+    token = form.get("token")
+    user = userData.query.filter_by(user=session["user"]).first()
+    if not user:
+        raise RuntimeError("Logged In User not in DB")
+    user.notification_id = token
+    # pylint: disable=E1101
+    db.session.commit()
+    # pylint: enable=E1101
+    print(vars(user))
+    return "OK"
+
+
+@app.route("/firebase-messaging-sw.js")
+def fbsw():
+    return send_from_directory("static", "firebase-sw.js")
 
 
 def collect_websocket(func):
@@ -153,7 +177,6 @@ def validate_stamp(stamp: int) -> int:
     return abs(int(stamp)) if isinstance(stamp, str) else abs(stamp)
 
 
-
 @app.websocket("/@/messenger/")
 @collect_websocket
 async def messenger():
@@ -166,6 +189,8 @@ async def messenger():
     while 1:
         _message = await ws.receive()
         try:
+            to_notify = False
+            ts_data = None
             # Database to be updated only on Read and message type calls
             message = json.loads(_message)
             if not all(i in message for i in ("user", "message", "stamp")):
@@ -224,6 +249,8 @@ async def messenger():
                     await ws.send(to_send)
                     if rec_user:
                         await rec_user.send(to_send)
+                    to_notify = True
+                    ts_data = chat_data
                 elif fetch:
                     if not _from:
                         await ws.send(
@@ -287,6 +314,10 @@ async def messenger():
                     await ws.send(to_send)
                     if rec_user:
                         await rec_user.send(to_send)
+                    to_notify = True
+                    ts_data = chat_data
+                if to_notify:
+                    _make_notify(session["user"], user, ts_data)
 
         except Exception as e:
             await ws.send(
@@ -295,6 +326,16 @@ async def messenger():
                 )
             )
             raise (e)
+
+
+def _make_notify(sender, receiver, chat_):
+    final = {}
+    data = chat_["data"]
+    final["sender"] = sender
+    final["messageContent"] = data["message"]
+    final["hasImage"] = data["mediaURL"]
+    print(final)
+    notify(receiver, final, userData)
 
 
 def get_data_from(_dict, _from):

@@ -1,1 +1,0 @@
-self.addEventListener("install",function(n){console.log(n)});

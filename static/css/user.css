@@ -234,3 +234,51 @@ body {
     font-weight: bold;
     width: 0;
 }
+
+.notification-action-button {
+    margin-left: 15px;
+    font-weight: bold;
+    color: #138fd0;
+    cursor: pointer;
+
+}
+
+.notification-action-box {
+    margin-top: 8px
+}
+
+.notification-text {
+    overflow: hidden;
+    word-break: unset;
+}
+
+.notification-sender {
+    font-weight: bolder;
+    overflow: hidden;
+}
+
+.notification-box {
+    position: absolute;
+    top: 0;
+    cursor: pointer;
+    transition: .3s ease-in-out;
+    border: 2px solid #e3e3e3;
+    border-radius: 20px;
+    height: auto;
+    min-height: 15px;
+    opacity: 1;
+    background: #fff;
+    width: 95%;
+    padding: 15px;
+    margin-top: -1000px;
+}
+
+.notification-reply-bar {
+    display: block;
+    background-color: #138fd0;
+    border: 2px solid #138fd0;
+    padding: 5px;
+    width: 90%;
+    color: #fff;
+    outline: none;
+}
