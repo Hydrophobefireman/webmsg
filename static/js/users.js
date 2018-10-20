@@ -1,9 +1,10 @@
 (async () => {
     const websocket_url = `${(window.location.protocol === 'https:' ? "wss://" : "ws://") +
     window.location.host}/@/messenger/`;
+    let messaging;
     if (!!window.Notification) {
         try {
-            const messaging = firebase.messaging();
+            messaging = firebase.messaging();
             await messaging.requestPermission();
             messaging.usePublicVapidKey(
                 "BGhv7XYjPBkpVoOEPbq2E19Is1ti_MYfboTDazKE0jgxPENxDqe0-U2p1OKEEgG4JH4Ycl8Wbxdv-UrrP_LcLmw");
