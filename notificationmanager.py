@@ -24,7 +24,7 @@ if not data:
         "type": "service_account",
         "project_id": "webmsg-py",
         "private_key_id": os.environ.get("g_private_key_id"),
-        "private_key": os.environ.get("g_private_key"),
+        "private_key": os.environ.get("g_private_key").replace("\\n", "\n"),
         "client_email": "pycode@webmsg-py.iam.gserviceaccount.com",
         "client_id": os.environ.get("g_client_id"),
         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
