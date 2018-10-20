@@ -2,26 +2,29 @@
     const messaging = firebase.messaging();
     const websocket_url = `${(window.location.protocol === 'https:' ? "wss://" : "ws://") +
     window.location.host}/@/messenger/`;
-    await messaging.requestPermission();
-    messaging.usePublicVapidKey(
-        "BGhv7XYjPBkpVoOEPbq2E19Is1ti_MYfboTDazKE0jgxPENxDqe0-U2p1OKEEgG4JH4Ycl8Wbxdv-UrrP_LcLmw");
-    // Callback fired if Instance ID token is updated.
-    await messaging.getToken();
-    const token_stuff = async () => {
-        const token = await messaging.getToken();
-        console.log('Token refreshed.');
-        console.log(token);
-        await fetch("/@/notify/", {
-            method: "post",
-            headers: {
-                "content-type": "application/x-www-form-urlencoded"
-            },
-            body: `token=${encodeURIComponent(token)}`
-        })
-    };
-    await token_stuff()
-    messaging.onTokenRefresh(token_stuff);
-
+    try {
+        await messaging.requestPermission();
+        messaging.usePublicVapidKey(
+            "BGhv7XYjPBkpVoOEPbq2E19Is1ti_MYfboTDazKE0jgxPENxDqe0-U2p1OKEEgG4JH4Ycl8Wbxdv-UrrP_LcLmw");
+        // Callback fired if Instance ID token is updated.
+        await messaging.getToken();
+        const token_stuff = async () => {
+            const token = await messaging.getToken();
+            console.log('Token refreshed.');
+            console.log(token);
+            await fetch("/@/notify/", {
+                method: "post",
+                headers: {
+                    "content-type": "application/x-www-form-urlencoded"
+                },
+                body: `token=${encodeURIComponent(token)}`
+            })
+        };
+        await token_stuff()
+        messaging.onTokenRefresh(token_stuff);
+    } catch (e) {
+        console.log("Permission-Denied")
+    }
     (new Image).src = "/static/attachment.svg";
     (new Image).src = "/static/close.svg"
     let getCurrUser;
