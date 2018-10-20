@@ -22,25 +22,18 @@ messaging.setBackgroundMessageHandler(payload => {
   }
   const notificationOptions = {
     requireInteraction: true,
-    body: bod
+    body: bod,
+    icon: "/favicon.ico"
   };
+  self.addEventListener("notificationclick", e => {
+    const notification = e.notification;
+    const data = notification.data;
+    const chat_id = data.chat_id;
+    clients.openWindow(`/chat/${chat_id}`)
+  })
+  if (data.hasImage) {
+    notificationOptions['image'] = data.hasImage
+  }
   return self.registration.showNotification(notificationTitle,
     notificationOptions);
 });
-`
-curl -X POST -H "Authorization: Bearer ya29.c.EmM8Bi6J9Yti5MQJTTxv1MtITVHOSOYPQa8f56Uh035_OsH1Qt00o9BZsuN_hvz8h1y0wJ68crloBAifaXCz_dNCGESNAvAYsOtXho0PpIPi9tvGP2Ymkk3Gx7VnhR1Y4NhCwdM" -H "Content-Type: application/json" -d '{
-  "message": {
-    "token" : "eGBUpXRct4g:APA91bEEdG2BP_9qCPKUgZbEFfBhIMkVYj6FPb2SvpkwmlBiwYD4_lKQZf8L3sCH5FvcCayNMmcU_IG1jvSH2uBQsXlvToT4-RGq0ZHEbcehmTzPVGaebEIrl9UaYhhLyDYow3lM7IKv",
-    "webpush": {
-      "headers": {
-        "Urgency": "high"
-      },
-      "data": {
-        "messageContent": "Hi Bhavesh",
-        "sender": "rohan",
-      }
-    }
-  }
-}' https://fcm.googleapis.com/v1/projects/webmsg-py/messages:send
-
-  `

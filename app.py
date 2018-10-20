@@ -334,6 +334,7 @@ def _make_notify(sender, receiver, chat_):
     final["sender"] = sender
     final["messageContent"] = data["message"]
     final["hasImage"] = data["mediaURL"]
+    final["chat_id"] = chat_["chatid"]
     print(final)
     notify(receiver, final, userData)
 
@@ -520,6 +521,7 @@ async def login():
     if check_password_hash(udata.pw_hash, password):
         session["logged_in"] = True
         session["user"] = udata.user
+        session.permanent = True
         resp = await make_response(
             json.dumps({"success": "authenticated", "user": udata.user})
         )
@@ -630,9 +632,6 @@ async def userpages(user):
         )
     else:
         return redirect(f"/u/{session['user']}")
-    return html_minify(
-        await render_template("chat.html", nonce=session["u-id"], user=user)
-    )
 
 
 if __name__ == "__main__":
