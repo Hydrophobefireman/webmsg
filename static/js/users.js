@@ -1,4 +1,7 @@
 (async () => {
+    window.onerror = function (err) {
+        alert(err)
+    }
     const messaging = firebase.messaging();
     const websocket_url = `${(window.location.protocol === 'https:' ? "wss://" : "ws://") +
     window.location.host}/@/messenger/`;
