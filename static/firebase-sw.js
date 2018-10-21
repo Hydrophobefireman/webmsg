@@ -29,7 +29,8 @@ messaging.setBackgroundMessageHandler(payload => {
     const notification = e.notification;
     const data = notification.data;
     const chat_id = data.chat_id;
-    clients.openWindow(`/chat/${chat_id}`)
+    e.notification.close();
+    e.waitUntil(clients.openWindow(`/chat/${chat_id}`));
   })
   if (data.hasImage) {
     notificationOptions['image'] = data.hasImage

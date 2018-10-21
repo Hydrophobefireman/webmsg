@@ -32,7 +32,6 @@ if not data:
         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
         "client_x509_cert_url": os.environ.get("g_client_x509_cert_url"),
     }
-
 else:
     cred_ = json.loads(data)
 cred = credentials.Certificate(cred_)

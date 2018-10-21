@@ -3,7 +3,7 @@ import os
 import re
 import secrets
 import time
-from functools import wraps
+
 from urllib.parse import urlparse
 
 import cloudinary.uploader
@@ -11,9 +11,11 @@ import passlib.hash as pwhash
 import requests
 from bs4 import BeautifulSoup as bs
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import or_
 from htmlmin.minify import html_minify
-from quart import (
-    Quart,
+
+from flask import (
+    Flask,
     Response,
     abort,
     make_response,
@@ -22,29 +24,15 @@ from quart import (
     send_from_directory,
     request,
     session,
-    websocket,
 )
 from sqlalchemy.orm.attributes import flag_modified
 from notificationmanager import notify
-from flask_tools import flaskUtils
 
-app = Quart(__name__)
-flaskUtils(app)
+
+app = Flask(__name__)
 
 app.secret_key = "GI4cEwO7e2g-Hc6jpo-StrXyRi_Qx8PTrCzzSfiR"
 dburl = os.environ.get("DATABASE_URL")
-try:
-    if dburl is None:
-        with open(".dbinfo_", "r") as f:
-            dburl = f.read()
-except FileNotFoundError:
-    raise Exception(
-        "No DB url specified try add it to the environment or create a .dbinfo_ file with the url"
-    )
-app.config["SQLALCHEMY_DATABASE_URI"] = dburl
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3163.100 Safari/537.36"
 
 
 def open_and_read(fn: str, mode: str = "r", strip: bool = True):
@@ -58,14 +46,17 @@ def open_and_read(fn: str, mode: str = "r", strip: bool = True):
     return data
 
 
-def check_password_hash(_hash, pw):
-    meth = pwhash.pbkdf2_sha512
-    return meth.verify(pw, _hash)
+if dburl is None:
+    dburl = open_and_read(".dbinfo_")
+if dburl is None:
+    raise Exception(
+        "No DB url specified try add it to the environment or create a .dbinfo_ file with the url"
+    )
 
-
-def generate_password_hash(pw):
-    meth = pwhash.pbkdf2_sha512
-    return meth.hash(pw)
+app.config["SQLALCHEMY_DATABASE_URI"] = dburl
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3163.100 Safari/537.36"
 
 
 class userData(db.Model):
@@ -96,367 +87,6 @@ class User(object):
         return check_password_hash(self.pw_hash, password)
 
 
-def is_heroku(url):
-    parsedurl = urlparse(url).netloc
-    return (
-        "127.0.0.1" not in parsedurl
-        or "localhost" not in parsedurl
-        or "192.168." not in parsedurl
-    ) and "herokuapp" in parsedurl
-
-
-app.__connectedSockets__ = set()
-
-
-@app.route("/@/notify/", methods=["POST"])
-async def set_user_token():
-    form = await request.form
-    if not session.get("logged_in") or not session.get("user") or not form.get("token"):
-        return "NO"
-    token = form.get("token")
-    user = userData.query.filter_by(user=session["user"]).first()
-    if not user:
-        raise RuntimeError("Logged In User not in DB")
-    user.notification_id = token
-    # pylint: disable=E1101
-    db.session.commit()
-    # pylint: enable=E1101
-    print(vars(user))
-    return "OK"
-
-
-@app.route("/firebase-messaging-sw.js")
-def fbsw():
-    return send_from_directory("static", "firebase-sw.js")
-
-
-def collect_websocket(func):
-    # https://medium.com/@pgjones/websockets-in-quart-f2067788d1ee
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        _obj = websocket._get_current_object()
-        setattr(_obj, "idxs", session["user"])
-        tr = []
-        for i in app.__connectedSockets__:
-            if i.idxs == session["user"]:
-                print("Multiple Socket Connections..removing previous one")
-                tr.append(i)
-        [app.__connectedSockets__.remove(i) for i in tr]
-        app.__connectedSockets__.add(_obj)
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            app.__connectedSockets__.remove(_obj)
-            print(f"Removing {_obj.idxs}")
-            raise e
-
-    return wrapper
-
-
-@app.route("/logout/")
-async def logout():
-    keys = [s for s in session]
-    [session.pop(i) for i in keys]
-    return redirect("/?auth=0")
-
-
-@app.route("/@/binary/", methods=["POST"])
-async def get_files():
-    data = await request.data
-    resp = upload(data)
-    return Response(
-        json.dumps({"url": resp["secure_url"]}), content_type="application/octet-stream"
-    )
-
-
-def validate_stamp(stamp: int) -> int:
-    if not isinstance(stamp, (str, float, int)) or (
-        isinstance(stamp, str) and not stamp.isnumeric()
-    ):
-        return time.time() * 1000
-    return abs(int(stamp)) if isinstance(stamp, str) else abs(stamp)
-
-
-@app.websocket("/@/messenger/")
-@collect_websocket
-async def messenger():
-    print([s.idxs for s in app.__connectedSockets__])
-    __available_types = ("typing", "message", "fetch_messages", "read")
-    users = app.__connectedSockets__
-    ws = websocket
-    if not session.get("logged_in"):
-        return await ws.send('{"error":"Not Logged in"}')
-    while 1:
-        _message = await ws.receive()
-        try:
-            to_notify = False
-            ts_data = None
-            # Database to be updated only on Read and message type calls
-            message = json.loads(_message)
-            if not all(i in message for i in ("user", "message", "stamp")):
-                await ws.send(json.dumps({"error": f"Insufficient Data received"}))
-            else:
-                user = message.get("user")
-                text = message.get("message")
-                istyping = message.get("typing")
-                fetch = message.get("fetch_messages")
-                read = message.get("read")
-                stamp = validate_stamp(message.get("stamp"))
-                media = message.get("media")
-                _from = message.get("fetch_from")
-                chat_data = None
-                chat_data_args = (session["user"], user, is_heroku(ws.url))
-                _connected_ = [s for s in users if s.idxs == user]
-                if session["user"] == user:
-                    ws.send(json.dumps({"error": "Invalid recepient"}))
-                chat = check_chat_data(*chat_data_args)
-                if not chat:
-                    print(
-                        f"Creating A new Chat between '{session['user']}' and '{user}'"
-                    )
-                    chat = create_chat_data(session["user"], user)
-                else:
-                    print(
-                        f"Using Existing Chat with id:{chat.id_};Participants:{session['user']}<=>{user}"
-                    )
-                chat_id = chat.id_
-                if istyping:
-                    rec_user = _connected_[0] if _connected_ else None
-                    if rec_user:
-                        await rec_user.send(
-                            json.dumps(
-                                {"message": None, "typing": True, "stamp": stamp}
-                            )
-                        )
-
-                elif text:
-                    rec_user = _connected_[0] if _connected_ else None
-                    chat_data = {
-                        "chatid": chat_id,
-                        "data": {
-                            "message": text,
-                            "sender": session["user"],
-                            "stamp": stamp,
-                            "read": False,
-                            "media": False,
-                            "mediaURL": None,
-                            "rstamp": None,
-                            "receiver": user,
-                        },
-                    }
-                    ind = alter_chat_data(chat_data)
-                    to_send = json.dumps({**chat_data["data"], "msgid": ind})
-                    await ws.send(to_send)
-                    if rec_user:
-                        await rec_user.send(to_send)
-                    to_notify = True
-                    ts_data = chat_data
-                elif fetch:
-                    if not _from:
-                        await ws.send(
-                            json.dumps(
-                                {
-                                    "data": check_chat_data(id_=chat_id).chats,
-                                    "fetch": True,
-                                    "full_fetch": True,
-                                }
-                            )
-                        )
-                    else:
-                        _data = check_chat_data(id_=chat_id).chats
-                        tsend = get_data_from(_data, _from)
-                        await ws.send(
-                            json.dumps(
-                                {
-                                    "data": tsend,
-                                    "full_fetch": False,
-                                    "fetch": True,
-                                    "fetched_from": _from + 1,
-                                }
-                            )
-                        )
-                elif read and read.get("user") != session["user"]:
-                    data = read
-                    msgs = chat.chats
-                    idx = data.get("id")
-                    part_msg = msgs.get(idx)
-                    if not part_msg:
-                        await ws.send(json.dumps({"error": "no such message"}))
-                    else:
-                        part_msg["read"] = True
-                        msgs[idx] = part_msg
-                        rec_user = _connected_[0] if _connected_ else None
-                        chat_data = {
-                            "chatid": chat_id,
-                            "msgid": idx,
-                            "update": {"read": True, "rstamp": stamp},
-                        }
-                        if rec_user:
-                            await rec_user.send(json.dumps(chat_data))
-                        alter_chat_data(chat_data, True)
-                elif media:
-                    rec_user = _connected_[0] if _connected_ else None
-                    chat_data = {
-                        "chatid": chat_id,
-                        "data": {
-                            "message": None,
-                            "sender": session["user"],
-                            "stamp": stamp,
-                            "read": False,
-                            "media": True,
-                            "mediaURL": media,
-                            "rstamp": None,
-                            "receiver": user,
-                        },
-                    }
-                    ind = alter_chat_data(chat_data)
-                    to_send = json.dumps({**chat_data["data"], "msgid": ind})
-                    await ws.send(to_send)
-                    if rec_user:
-                        await rec_user.send(to_send)
-                    to_notify = True
-                    ts_data = chat_data
-                if to_notify:
-                    _make_notify(session["user"], user, ts_data)
-
-        except Exception as e:
-            await ws.send(
-                json.dumps(
-                    {"error": f"Invalid Data received from the user: {_message[:50]}"}
-                )
-            )
-            raise (e)
-
-
-def _make_notify(sender, receiver, chat_):
-    final = {}
-    data = chat_["data"]
-    final["sender"] = sender
-    final["messageContent"] = data["message"]
-    final["hasImage"] = data["mediaURL"]
-    final["chat_id"] = chat_["chatid"]
-    print(final)
-    notify(receiver, final, userData)
-
-
-def get_data_from(_dict, _from):
-    mark = None
-    tr = {}
-    if not isinstance(_from, (str, int)):
-        print("Bad Type")
-        return {}
-    elif isinstance(_from, str):
-        if not _from.isnumeric():
-            print("not a number")
-            return {}
-        mark = int(_from) + 1
-    else:
-        mark = _from + 1
-    while 1:
-        data = _dict.get(mark)
-        if data:
-            tr[mark] = data
-            mark += 1
-        else:
-            break
-    return tr
-
-
-def alter_chat_data(data, update=False):
-    # pylint: disable=E1101
-    if update and data.get("msgid") is None:
-        raise ValueError("Cannot Update without message ID")
-    msgs = {}
-    if not update:
-        chat_data = chatData.query.filter_by(id_=data["chatid"]).first()
-        msgs = chat_data.chats
-        msg_index = len(msgs)
-        msgs[msg_index] = data["data"]
-        chat_data.chats = msgs
-        flag_modified(chat_data, "chats")
-        db.session.merge(chat_data)
-        db.session.commit()
-        return msg_index
-    else:
-        chat_data = chatData.query.filter_by(id_=data["chatid"]).first()
-        msgs = chat_data.chats
-        msgid = data["msgid"]
-        edit_ = msgs[msgid]
-        edit_["read"] = data["update"]["read"]
-        edit_["rstamp"] = data["update"]["rstamp"]
-        msgs[msgid] = edit_
-        chat_data.chats = msgs
-        flag_modified(chat_data, "chats")
-        db.session.merge(chat_data)
-        db.session.commit()
-        return True
-    # pylint: enable=E1101
-
-
-@app.route("/api/chatid/", methods=["POST"])
-async def get_chat_id():
-    form = await request.form
-    if not session.get("logged_in") or not session.get("user"):
-        return "", 403
-    elif not form.get("side_a") and not form.get("side_b"):
-        return "", 500
-    elif session["user"] != form.get("side_a"):
-        return "Invalid Request", 500
-    data = check_chat_data(form["side_a"], form["side_b"])
-    if not data:
-        return "", 403
-    else:
-        return data.id_
-
-
-def check_chat_data(
-    u1: str = None, u2: str = None, isheroku: bool = True, id_: str = None
-):
-    if id_:
-        dat = chatData.query.filter_by(id_=id_).first()
-        if dat:
-            return dat
-    n1, n2 = sorted((u1, u2))
-    __data = None
-    _testvar_ = False
-    if not isheroku and _testvar_:
-        # cache localhost chat between dummy account to not create a DB call on every message
-        __data = open_and_read("__usercache.json")
-    if __data:
-        d = json.loads(__data)
-        print("Cached Data")
-        return chatData(u1=d["user1"], u2=d["user2"])
-    data = (
-        chatData.query.filter_by(user1=n1, user2=n2).first()
-        or chatData.query.filter_by(user1=n2, user2=n1).first()
-    )  # we shoudln't be checking the second one but better safe than sorry
-    if data and not is_heroku and _testvar_:
-        tw = {
-            "chats": data.chats,
-            "id_": data.id_,
-            "user1": data.user1,
-            "user2": data.user2,
-        }
-        with open("__usercache.json", "w") as f:
-            f.write(json.dumps(tw))
-    return data
-
-
-def create_chat_data(u1: str, u2: str) -> bool:
-    n1, n2 = sorted((u1, u2))
-    data = chatData(u1=n1, u2=n2)
-    if (
-        not userData.query.filter_by(user=n1).first()
-        or not userData.query.filter_by(user=n2).first()
-    ):
-        raise RuntimeError("Cannot create chat between Non Existent users")
-    # pylint: disable=E1101
-    db.session.add(data)
-    db.session.commit()
-    return data
-    # pylint: enable=E1101
-
-
 class chatData(db.Model):
     # pylint: disable=E1101
     id_ = db.Column(db.String(20), primary_key=True)
@@ -465,7 +95,7 @@ class chatData(db.Model):
     chats = db.Column(db.PickleType)
     # pylint: enable=E1101
     def __init__(self, u1, u2, chats={}):
-        self.id_ = secrets.token_urlsafe(10)
+        self.id_ = secrets.token_urlsafe(12)
         self.user1 = u1
         self.user2 = u2
         self.chats = chats
@@ -474,70 +104,242 @@ class chatData(db.Model):
         return "<Chat:%r <=> %r>" % (self.user1, self.user2)
 
 
-def upload(imgurl):
-    clapi_key = os.environ.get("key") or open_and_read("a.cloudinary")
-    clapi_secret = os.environ.get("cl_secret") or open_and_read("b.cloudinary")
-    if clapi_key is None:
-        raise Exception("no key provided")
-    cloudinary.config(
-        cloud_name="cdn-media-proxy", api_key=clapi_key, api_secret=clapi_secret
+@app.route("/favicon.ico")
+def send_fav():
+    return send_from_directory(os.path.join(app.root_path, "static"), "favicon.ico")
+
+
+@app.before_request
+def enforce_https():
+    request.process_time = time.time()
+    if (
+        request.endpoint in app.view_functions
+        and not request.is_secure
+        and not request.headers.get("X-Forwarded-Proto", "http") == "https"
+        and "127.0.0.1" not in request.url
+        and "localhost" not in request.url
+        and "herokuapp." in request.url
+        and "http://" in request.url[:8]
+    ):
+        return redirect(request.url.replace("http://", "https://"), code=302)
+
+
+@app.route("/@/notify/", methods=["POST"])
+def make_notif():
+    form = request.form
+    if not session.get("logged_in") or not session.get("user") or not form.get("token"):
+        return "NO"
+    token = form.get("token")
+    user = userData.query.filter_by(user=session["user"]).first()
+    if not user:
+        return "ERROR:USER NOT IN DB", 500
+    user.notification_id = token
+    # pylint: disable=E1101
+    db.session.commit()
+    # pylint: enable=E1101
+    return "OK"
+
+
+@app.route("/firebase-messaging-sw.js")
+def fbsw():
+    return send_from_directory("static", "firebase-sw.js")
+
+
+@app.route("/logout/")
+def logout():
+    keys = [s for s in session]
+    [session.pop(i) for i in keys]
+    return redirect("/?auth=0")
+
+
+@app.route("/@/binary/", methods=["POST"])
+def upload_bin():
+    data = request.data
+    resp = upload(data)
+    return Response(
+        json.dumps({"url": resp["secure_url"]}), content_type="application/octet-stream"
     )
-    a = cloudinary.uploader.upload(imgurl)
-    return a
+
+
+@app.route("/@/messenger/", methods=["POST"])
+def messenger():
+    data = request.get_json()
+    if not session.get("user") or not session.get("logged_in"):
+        return Response(
+            json.dumps({"error": "Not Authenticated..did you clear your cookies?"}),
+            content_type="application/json",
+        )
+    has_falsey, falsey_vals = has_false_types(
+        data, ("sender", "receiver", "chat_id", "message", "stamp")
+    )
+    if has_falsey:
+        return Response(
+            json.dumps(
+                {"error": f"No values provided for :{force_join(falsey_vals)} ."}
+            )
+        )
+    sender = data["sender"]
+    receiver = data["receiver"]
+    chat_id = data["chat_id"]
+    message = data["message"]
+    tstamp = validate_stamp(data["stamp"])
+    fetch = data.get("fetch_messages")
+    fetch_from = data.get("fetch_from")
+    read = data.get("read")
+    media = data.get("media")
+    chat_data = None
+    if (
+        not sender == data["sender"]
+        or sender == data["receiver"]
+        or not session.get("user") == sender
+    ):
+        return Response(
+            json.dumps({"error": f"Invalid sender value {sender}"}),
+            content_type="application/json",
+        )
+    chat = verify_chat(session["user"], receiver, chat_id)
+    if not chat:
+        print(f"Creating A new Chat between '{session['user']}' and '{receiver}'")
+        chat = create_chat_data(session["user"], receiver)
+    else:
+        print(
+            f"Using Existing Chat with id:{chat.id_};Participants:{session['user']}<=>{receiver}"
+        )
+
+    if message:
+        _chat_data = {
+            "chat_id": chat_id,
+            "data": {
+                "message": message,
+                "sender": sender,
+                "receiver": receiver,
+                "stamp": tstamp,
+                "read": False,
+                "media": False,
+                "mediaURL": None,
+                "rstamp": None,
+            },
+        }
+        ind = alter_chat_data(_chat_data)
+        to_send = json.dumps({**_chat_data["data"], "msgid": ind})
+        _make_notify(session["user"], receiver, _chat_data)
+        return Response(json.dumps(to_send), content_type="application/json")
+    if fetch:
+        if not fetch_from:
+            return Response(
+                json.dumps(
+                    {
+                        "data": check_chat_data(id_=chat_id).chats,
+                        "fetch": True,
+                        "full_fetch": True,
+                    }
+                ),
+                content_type="application/json",
+            )
+        else:
+            _data = check_chat_data(id_=chat_id).chats
+            tsend = get_data_from(_data, fetch_from)
+            return Response(
+                json.dumps(
+                    {
+                        "data": tsend,
+                        "full_fetch": False,
+                        "fetch": True,
+                        "fetched_from": fetch_from + 1,
+                    }
+                ),
+                content_type="application/json",
+            )
+    if read and sender == session["user"]:
+        print("OK")
+        data = read
+        msgs = chat.chats
+        idx = data.get("id")
+        part_msg = msgs.get(idx)
+        if not part_msg:
+            return Response(json.dumps({"error": "no_such_message"}))
+        part_msg["read"] = True
+        msgs[idx] = part_msg
+        chat_data = {
+            "chat_id": chat_id,
+            "msgid": idx,
+            "update": {"read": True, "rstamp": tstamp},
+        }
+        alter_chat_data(chat_data, True)
+        print("ADD READ NOTIF")
+        # _make_notify(sender, receiver, chat_data)
+        return Response(json.dumps({"success": "ok"}), content_type="application/json")
+    if media:
+        chat_data = {
+            "chat_id": chat_id,
+            "data": {
+                "message": None,
+                "sender": session["user"],
+                "stamp": tstamp,
+                "read": False,
+                "media": True,
+                "mediaURL": media,
+                "rstamp": None,
+                "receiver": receiver,
+            },
+        }
+        ind = alter_chat_data(chat_data)
+        to_send = json.dumps({**chat_data["data"], "msgid": ind})
+        _make_notify(session["user"], receiver, chat_data)
+        return Response(json.dumps(to_send), content_type="application/json")
+    return Response(json.dumps({"error": "Bad Request"})), 500
 
 
 @app.route("/")
-async def main():
+def main():
+    session.permanent = True
     session["u-id"] = secrets.token_urlsafe(30)
     if not session.get("user"):
         session["logged_in"] = False
     if session.get("logged_in"):
         return redirect(f"/u/{session['user']}/?auth=1")
-    return html_minify(await render_template("index.html", nonce=session["u-id"]))
+    return html_minify(render_template("index.html", nonce=session["u-id"]))
 
 
 @app.route("/login/check/", methods=["GET", "POST"])
-async def login():
+def login():
     resp, code = json.dumps({"response": "dummy"}), 200
     if request.method == "GET":
         return redirect("/?wmsg_rd=login")
-    reqform = await request.form
+    reqform = request.form
     user, password, integrity = (
         reqform.get("user"),
         reqform.get("password"),
         reqform.get("integrity"),
     )
     if user is None or password is None or integrity != session["u-id"]:
-        resp = await make_response(
-            json.dumps({"error": "fields_empty_or_session_error"})
-        )
+        resp = make_response(json.dumps({"error": "fields_empty_or_session_error"}))
         code = 403
     udata = userData.query.filter_by(user=user).first()
     if udata is None:
-        resp = await make_response(json.dumps({"error": "no_such_user"}))
+        resp = make_response(json.dumps({"error": "no_such_user"}))
         code = 403
         return resp, code
     session["logged_in"] = False
     if check_password_hash(udata.pw_hash, password):
         session["logged_in"] = True
         session["user"] = udata.user
-        session.permanent = True
-        resp = await make_response(
+        resp = make_response(
             json.dumps({"success": "authenticated", "user": udata.user})
         )
     else:
         session["logged_in"] = False
-        resp = await make_response(json.dumps({"error": "incorrect_password"}))
+        resp = make_response(json.dumps({"error": "incorrect_password"}))
         code = 403
     resp.headers["Content-Type"] = "application/json"
     return resp, code
 
 
 @app.route("/register/check/", methods=["GET", "POST"])
-async def register():
+def register():
     if request.method == "GET":
         return redirect("/?wmsg_rd=login")
-    reqform = await request.form
+    reqform = request.form
     user, password, integrity, checkpw, sessid = (
         reqform.get("user"),
         reqform.get("password"),
@@ -580,24 +382,24 @@ async def register():
             content_type="application/json",
             status=403,
         )
-    print("registered:", data)
+    print(f"registered:{data}")
     return Response(
         json.dumps({"success": "login_now"}), content_type="application/json"
     )
 
 
 @app.route("/api/user-search/tokens/<nonce>")
-async def get_search_token(nonce):
+def get_search_token(nonce):
     if nonce != session.get("u-id"):
         return ""
-    token = secrets.token_hex(20)
+    token = secrets.token_urlsafe(20)
     session["search-token"] = token
     return token
 
 
 @app.route("/api/users/", methods=["POST"])
-async def get_search_results():
-    reqform = await request.form
+def get_search_results():
+    reqform = request.form
     token = reqform["token"]
     user = reqform.get("user")
     if isinstance(user, str):
@@ -605,34 +407,249 @@ async def get_search_results():
         print("sanitized user:", user)
     if not user or len(user) == 0:
         print("invalid user args")
-        resp = {"users": []}
+        return Response(json.dumps({"users": []}), content_type="application/json")
     if token != session["search-token"]:
         print("Invalid Token")
-        resp = {"users": []}
-    data = [
-        s.user
-        for s in userData.query.filter(userData.user.op("~")(r"(?is).*?%s" % (user)))
+        return Response(json.dumps({"users": []}), content_type="application/json")
+    _data = [
+        s
+        for s in userData.query.filter(
+            userData.user.op("~")(r"(?is).*?%s" % (re.escape(user)))
+        )
         .limit(30)
         .all()
         if s.user != session["user"]
     ]
-    session.pop("search-token")
+    data = [
+        {"user": s.user, "chat_id": check_chat_data(session["user"], s.user).id_}
+        for s in _data
+    ]
     resp = {"users": data}
     return Response(json.dumps(resp), content_type="application/json")
 
 
 @app.route("/u/<user>/", strict_slashes=False)
-async def userpages(user):
+def userpages(user):
     if not session.get("logged_in"):
         return redirect("/?auth=0")
     session["u-id"] = secrets.token_urlsafe(30)
     if session["user"] == user:
         return html_minify(
-            await render_template("user.html", nonce=session["u-id"], user=user)
+            render_template("user.html", nonce=session["u-id"], user=user)
         )
     else:
-        return redirect(f"/u/{session['user']}")
+        return redirect(f'/u/{session["user"]}')
+
+
+@app.route("/chat/<chat_id>/", strict_slashes=False)
+def make_chat_(chat_id):
+    data = check_chat_data(id_=chat_id)
+    if not data:
+        return "NO"
+    here = data.user1 if data.user1 == session["user"] else data.user2
+    there = data.user1 if not data.user1 == session["user"] else data.user2
+    print(here, there)
+    if not session.get("logged_in") or not session.get("user") == here:
+        return "NO", 403
+    return html_minify(
+        render_template("chat.html", here=here, there=there, chat_id=chat_id)
+    )
+
+
+@app.route("/api/chat_ids/", methods=["POST"])
+def get_previous_chats():
+    idx = request.form.get("user")
+    if not idx or not idx == session.get("user") or not session.get("logged_in"):
+        return Response(json.dumps({"error": "Not Authenticated"}), status=403)
+    _chats1 = chatData.query.filter(
+        or_(chatData.user1 == idx, chatData.user2 == idx)
+    ).all()
+    all_chats = [
+        s
+        for s in map(
+            lambda x: {"user": x.user1, "chat_id": x.id_}
+            if not x.user1 == idx
+            else {"user": x.user2, "chat_id": x.id_},
+            _chats1,
+        )
+    ]
+    return Response(
+        json.dumps({"previous_chats": all_chats}), content_type="application/json"
+    )
+
+
+def _make_notify(sender, receiver, chat_):
+    final = {}
+    data = chat_.get("data") or chat_.get("update")
+    final["sender"] = sender
+    final["messageContent"] = data["message"]
+    final["hasImage"] = data.get("mediaURL")
+    final["chat_id"] = chat_["chat_id"]
+    print(final)
+    notify(receiver, final, userData)
+
+
+def get_data_from(_dict, _from):
+    mark = None
+    tr = {}
+    if not isinstance(_from, (str, int)):
+        print("Bad Type")
+        return {}
+    elif isinstance(_from, str):
+        if not _from.isnumeric():
+            print("not a number")
+            return {}
+        mark = int(_from) + 1
+    else:
+        mark = _from + 1
+    while 1:
+        data = _dict.get(mark)
+        if data:
+            tr[mark] = data
+            mark += 1
+        else:
+            break
+    return tr
+
+
+def validate_stamp(stamp: int) -> int:
+    if not isinstance(stamp, (str, float, int)) or (
+        isinstance(stamp, str) and not stamp.isnumeric()
+    ):
+        return time.time() * 1000
+    return abs(int(stamp)) if isinstance(stamp, str) else abs(stamp)
+
+
+def check_password_hash(_hash, pw):
+    meth = pwhash.pbkdf2_sha512
+    return meth.verify(pw, _hash)
+
+
+def generate_password_hash(pw):
+    meth = pwhash.pbkdf2_sha512
+    return meth.hash(pw)
+
+
+def is_heroku(url):
+    parsedurl = urlparse(url).netloc
+    return (
+        "127.0.0.1" not in parsedurl
+        or "localhost" not in parsedurl
+        or "192.168." not in parsedurl
+    ) and "herokuapp" in parsedurl
+
+
+def upload(imgurl):
+    clapi_key = os.environ.get("key") or open_and_read("a.cloudinary")
+    clapi_secret = os.environ.get("cl_secret") or open_and_read("b.cloudinary")
+    if clapi_key is None:
+        raise Exception("no key provided")
+    cloudinary.config(
+        cloud_name="cdn-media-proxy", api_key=clapi_key, api_secret=clapi_secret
+    )
+    a = cloudinary.uploader.upload(imgurl)
+    return a
+
+
+def has_false_types(_dict, vals):
+    falses = []
+    _k = _dict.keys()
+    for val in vals:
+        if not val in _k:
+            falses.append(val)
+    if falses:
+        return True, falses
+    return False, None
+
+
+def force_join(_list, lim=","):
+    return lim.join(map(str, _list))
+
+
+def check_chat_data(u1=None, u2=None, id_=None):
+    if id_:
+        dat = chatData.query.filter_by(id_=id_).first()
+        if dat:
+            return dat
+    if not u1 or not u2:
+        print("No useful arguments")
+        return None
+    n1, n2 = sorted((u1, u2))
+    __data = None
+    data = (
+        chatData.query.filter_by(user1=n1, user2=n2).first()
+        or chatData.query.filter_by(user1=n2, user2=n1).first()
+    )  # we shoudln't be checking the second one but better safe than sorry
+    return data
+
+
+def verify_chat(u1, u2, idx):
+    print(u1, u2, idx)
+    n1, n2 = sorted((u1, u2))
+    dat = check_chat_data(id_=idx)
+    if (n1 == dat.user1 and n2 == dat.user2) or (n1 == dat.user2 and n2 == dat.user1):
+        if idx == dat.id_:
+            return dat
+        else:
+            False
+    else:
+        False
+
+
+def create_chat_data(u1: str, u2: str) -> bool:
+    n1, n2 = sorted((u1, u2))
+    data = chatData(u1=n1, u2=n2)
+    if (
+        not userData.query.filter_by(user=n1).first()
+        or not userData.query.filter_by(user=n2).first()
+    ):
+        raise RuntimeError("Cannot create chat between Non Existent users")
+    # pylint: disable=E1101
+    db.session.add(data)
+    db.session.commit()
+    return data
+    # pylint: enable=E1101
+
+
+def alter_chat_data(data, update=False):
+    # pylint: disable=E1101
+    if update and data.get("msgid") is None:
+        raise ValueError("Cannot Update without message ID")
+    msgs = {}
+    if not update:
+        chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
+        msgs = chat_data.chats
+        msg_index = len(msgs)
+        msgs[msg_index] = data["data"]
+        chat_data.chats = msgs
+        flag_modified(chat_data, "chats")
+        db.session.merge(chat_data)
+        db.session.commit()
+        return msg_index
+    else:
+        chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
+        msgs = chat_data.chats
+        msgid = data["msgid"]
+        edit_ = msgs[msgid]
+        edit_["read"] = data["update"]["read"]
+        edit_["rstamp"] = data["update"]["rstamp"]
+        msgs[msgid] = edit_
+        chat_data.chats = msgs
+        flag_modified(chat_data, "chats")
+        db.session.merge(chat_data)
+        db.session.commit()
+        return True
+    # pylint: enable=E1101
 
 
 if __name__ == "__main__":
-    app.run(use_reloader=True, host="0.0.0.0")
+    app.run(host="0.0.0.0", debug=True)
+
+"""    if istyping:
+        _notif = {"message": None, "typing": True, "stamp": tstamp}
+        _chat_data = {"chat_id": chat_id, "data": _notif}
+        _m a k e     _notify(sender, receiver, _chat_data)
+        return Response(
+            json.dumps({"stat": "Success"}), content_type="application/json"
+        )
+"""
