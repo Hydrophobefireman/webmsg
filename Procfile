@@ -1,1 +1,1 @@
-web: hypercorn get:app -b 0.0.0.0:$PORT -k 5
+web: hypercorn app:app -b 0.0.0.0:$PORT -k 5
