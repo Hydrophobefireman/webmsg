@@ -135,7 +135,7 @@
             const markAsRead = $.create("span");
             const reply_inp = $.create("input");
             const sender = _data.sender;
-            const text = _data.messageContent;
+            const text = _data.message;
             const isMedia = _data.hasImage;
             const chatID = _data.chat_id;
             $.set(reply_inp, "class", "notification-reply-bar");
@@ -258,23 +258,22 @@
             prevchats.appendChild(a);
         }
     }))();
-    async function fetchData(obj, url = "/@/messenger/") {
-        let js;
-        if (typeof obj === "object") {
-            js = JSON.stringify(obj)
-        } else if (typeof obj === "string") {
-            js = obj
-        };
-        const req = new Request(url, {
-            method: "post",
-            headers: {
-                "content-type": "application/json"
-            },
-            body: js
-        });
-        const resp = await fetch(req);
-        const _data = await resp.text();
-        return _data
+
+    function fetchData(obj) {
+        return new Promise((res, rej) => {
+            let js;
+            if (typeof obj === "object") {
+                js = JSON.stringify(obj)
+            } else if (typeof obj === "string") {
+                js = obj
+            };
+            const wsproto = (window.location.protocol === 'https:' ? "wss://" : "ws://");
+            const websocket_url = `${wsproto}${window.location.host}/@/messenger/`;
+            const ws = new WebSocket(websocket_url);
+            ws.onopen = function () {
+                res(ws.send(js))
+            }
+        })
     }
 
 }))()

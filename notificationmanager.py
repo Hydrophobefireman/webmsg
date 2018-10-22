@@ -60,6 +60,7 @@ def notify(user, data, db):
             "webpush": {"headers": {"Urgency": "high"}, "data": data},
         }
     }
+    print("\n\n\n", data_fs)
     req = requests.post(URL, headers=headers, data=json.dumps(data_fs))
     print(req.text)
     return req.text

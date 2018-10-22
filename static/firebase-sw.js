@@ -9,6 +9,13 @@ firebase.initializeApp({
   "projectId": "webmsg-py"
 });
 const messaging = firebase.messaging();
+self.addEventListener("notificationclick", e => {
+  const notification = e.notification;
+  const data = notification.data;
+  const chat_id = data.chat_id;
+  e.notification.close();
+  e.waitUntil(clients.openWindow(`/chat/${chat_id}`));
+})
 messaging.setBackgroundMessageHandler(payload => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
   // Customize notification here
@@ -25,13 +32,6 @@ messaging.setBackgroundMessageHandler(payload => {
     body: bod,
     icon: "/favicon.ico"
   };
-  self.addEventListener("notificationclick", e => {
-    const notification = e.notification;
-    const data = notification.data;
-    const chat_id = data.chat_id;
-    e.notification.close();
-    e.waitUntil(clients.openWindow(`/chat/${chat_id}`));
-  })
   if (data.hasImage) {
     notificationOptions['image'] = data.hasImage
   }

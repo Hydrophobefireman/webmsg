@@ -146,7 +146,7 @@
 
                 };
                 const _t = await fetchData(_read);
-                parseResponse(_t);
+                ////(_t);
             }
         }
         if (js.message) {
@@ -266,7 +266,7 @@
                             stamp: new Date().getTime()
                         };
                         const txt = await fetchData(ws_data);
-                        parseResponse(txt);
+                        ////(txt);
                     }
                 }
                 reader.readAsDataURL(f);
@@ -289,7 +289,7 @@
                     };
                     txtbox.value = '';
                     const resp = await fetchData(data);
-                    parseResponse(resp)
+                    ////(resp)
                 }
             }
         };
@@ -331,7 +331,7 @@
             const markAsRead = $.create("span");
             const reply_inp = $.create("input");
             const sender = _data.sender;
-            const text = _data.messageContent;
+            const text = _data.message;
             const isMedia = _data.hasImage;
             const chatID = _data.chat_id;
             $.set(reply_inp, "class", "notification-reply-bar");
@@ -419,7 +419,7 @@
                 } else {
                     /*instead of our app checking periodically for notifications..we will let firebase do that for us
                     however we will also periodically update our IDB storage and..paint the page if any updates are found */
-                    parse_message($.id("_msg_body"), data)
+                    //  parse_message($.id("_msg_body"), data)
                 }
             });
         } else {
@@ -453,7 +453,7 @@
                 if (__msg__) {
                     __msg__.msgid = i;
                     console.log(`Parsing msgid: ${i} from cache`)
-                    parse_message(parent_element, __msg__);
+                    await parse_message(parent_element, __msg__);
                 }
             }
             _resp = await fetchData(obj);
@@ -467,15 +467,14 @@
                 receiver: THERE,
                 fetch_messages: true
             };
-            _resp = await fetchData(obj)
+            _resp = await fetchData(obj);
         }
-        const __json = JSON.parse(_resp)
-        parse_message(parent_element, __json);
+        ////(_resp);
     }
 
     function checkForMessages() {
         console.log(`[-] Manually Checking For Messages [Periodic Timer:${periodicCheckTimer}]`)
-        setTimeout(updatePageCache, periodicCheckTimer);
+        updatePageCache();
     }
     async function resize(img, quality, mime_type) {
         const canvas = document.createElement('canvas');
@@ -622,6 +621,33 @@
         console.log(dataset);
     };
 
+    const wsproto = (window.location.protocol === 'https:' ? "wss://" : "ws://");
+    const websocket_url = `${wsproto}${window.location.host}/@/messenger/`;
+    const ws = new WebSocket(websocket_url);
+    console.log(ws)
+    ws.onmessage = response => {
+        const _data = response.data;
+        if (_data === "pong") {
+            return
+        }
+        parseResponse(_data)
+    };
+    ws.onopen = () => {
+        console.log("Opened Socket")
+        createChatBox(THERE);
+        checkForMessages();
+        (function keepAlivePings() {
+            if (ws.readyState !== ws.CLOSED && ws.readyState !== ws.CLOSING) {
+                ws.send("ping");
+            }
+            console.log("keeping alive")
+            setTimeout(keepAlivePings, 30 * 1000)
+        })()
+    };
+    ws.onclose = () => {
+        /* reconnect to the websocket When we begin caching the data...this wont create requests as well*/
+        $.id("_msg_body").innerHTML = "<br>Connection to server was lost. Please Reload the page"
+    }
     async function fetchData(obj, url = "/@/messenger/") {
         let js;
         if (typeof obj === "object") {
@@ -629,16 +655,7 @@
         } else if (typeof obj === "string") {
             js = obj
         };
-        const req = new Request(url, {
-            method: "post",
-            headers: {
-                "content-type": "application/json"
-            },
-            body: js
-        });
-        const resp = await fetch(req);
-        const _data = await resp.text();
-        return _data
+        ws.send(js);
     }
 
     function parseResponse(msg) {
@@ -655,7 +672,4 @@
             bod.innerHTML += '<br>An error occured Please reload the page'
         }
     }
-    createChatBox(THERE);
-    updatePageCache()
-    checkForMessages();
 }))()
