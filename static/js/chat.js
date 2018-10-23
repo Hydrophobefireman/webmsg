@@ -196,7 +196,7 @@
         $.set($menubox, 'data-stat', 'closed');
         $.set($user, "class", "chat_with");
         $.set($menubox, 'class', 'menu-details');
-        $menu.id = "__menubox__";
+        $menubox.id = "__menubox__";
         $.set($menu, 'class', 'menubox');
         $.set(txtbox, 'type', 'text');
         $.set(txtbox, 'placeholder', 'Type a Message');
