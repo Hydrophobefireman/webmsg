@@ -207,7 +207,7 @@
         $.set(img, 'class', 'context');
         $.set(close_btn, 'class', 'img-button-holder');
         $.set(attach_btn, 'class', 'img-button-holder');
-        $.set(txtbox, 'data-user', u)
+        $.set(txtbox, 'data-user', u);
         bod.id = "_msg_body"
         $menubox.appendChild(close_btn);
         $menubox.appendChild(attach_btn);
@@ -224,7 +224,8 @@
         results_all.appendChild(boxwrap);
         close_btn.onclick = () => {
             window.location = `/u/${HERE}`;
-        }
+        };
+        $menu.id = "Nzk3NzEzOD"
         close_btn.textContent = "Close Conversation";
         attach_btn.textContent = "Add An Attachment";
         $menu.onclick = () => {
@@ -235,7 +236,8 @@
                 $.set($menubox, 'data-stat', 'opened')
                 $menubox.style.marginBottom = '0px';
             }
-        }
+        };
+
         attach_btn.onclick = () => {
             const files = $.create("input");
             $.set(files, 'accept', 'image/*')
@@ -442,9 +444,13 @@
                     await parse_message(template, __msg__);
                 }
             }
+            const _scroll = parent_element.scrollTop;
             parent_element.replaceWith(template);
-            template.scrollTop = template.scrollHeight;
-            template.id = "_msg_body"
+            template.scrollTop = _scroll;
+            template.id = "_msg_body";
+            template.onclick = () => {
+                toggle_menu()
+            }
             parent_element.remove()
 
             _resp = await fetchData(obj);
@@ -624,17 +630,25 @@
         }
         parseResponse(_data)
     };
+
+    function toggle_menu() {
+        const el = $.id("Nzk3NzEzOD");
+        el.click()
+    }
     ws.onopen = async () => {
         console.log("Opened Socket")
         createChatBox(THERE);
         await checkForMessages();
-        (function keepAlivePings() {
-            if (ws.readyState !== ws.CLOSED && ws.readyState !== ws.CLOSING) {
-                ws.send("ping");
-            }
-            console.log("keeping alive")
-            setTimeout(keepAlivePings, 30 * 1000)
-        })()
+        $.id("_msg_body").onclick = (() => {
+                toggle_menu()
+            })
+            (function keepAlivePings() {
+                if (ws.readyState !== ws.CLOSED && ws.readyState !== ws.CLOSING) {
+                    ws.send("ping");
+                }
+                console.log("keeping alive")
+                setTimeout(keepAlivePings, 30 * 1000)
+            })()
     };
     ws.onclose = () => {
         /* reconnect to the websocket When we begin caching the data...this wont create requests as well*/
