@@ -139,7 +139,6 @@ async def messenger():
     while 1:
         data = None
         __data = await ws.receive()
-        print("SOCKET DATA\n", __data)
         if __data == "ping":
             # keep alive for heroku
             await ws.send("pong")
@@ -192,7 +191,6 @@ async def messenger():
                     f"Using Existing Chat with id:{chat.id_};Participants:{session['user']}<=>{receiver}"
                 )
             if message:
-                print("message")
                 _chat_data = {
                     "chat_id": chat_id,
                     "data": {
@@ -209,7 +207,6 @@ async def messenger():
                 ind = alter_chat_data(_chat_data)
                 to_send = json.dumps({**_chat_data["data"], "msgid": ind})
                 _chat_data["msgid"] = ind
-                print("[message]", ind)
                 await ws.send(to_send)
                 await _make_notify(session["user"], receiver, _chat_data)
             elif fetch:
@@ -237,7 +234,6 @@ async def messenger():
                         )
                     )
             elif read and sender == session["user"]:
-                print("read")
                 data = read
                 msgs = chat.chats
                 idx = data.get("id")
@@ -517,22 +513,22 @@ async def get_previous_chats():
 
 async def _make_notify(sender, receiver, chat_, read=False):
     final = {}
-    data = chat_.get("data") or chat_.get("update")
-    final["hasImage"] = data.get("mediaURL")
-    final["chat_id"] = chat_["chat_id"]
-    final["sender"] = data.get("sender")
-    final["receiver"] = data.get("receiver")
-    final["message"] = data.get("message")
-    if read:
-        final["msgid"] = chat_.get("msgid")
+    data = None
+    if not read:
+        data = chat_.get("data")
+        final["hasImage"] = data.get("mediaURL")
+        final["chat_id"] = chat_["chat_id"]
+        final["sender"] = data.get("sender")
+        final["receiver"] = data.get("receiver")
+        final["message"] = data.get("message")
     _req_socket = [s for s in app.__sockets__ if s.__user__ == receiver]
     if _req_socket:
         try:
-            print(_req_socket)
+            if read:
+                return await _req_socket[0].send(json.dumps(chat_))
             await _req_socket[0].send(json.dumps({**data, "msgid": chat_.get("msgid")}))
         except Exception as e:  # user disconnected?
             print(e)
-    print(data)
     if not read:
         notify(receiver, final, userData)
 
@@ -668,7 +664,6 @@ def alter_chat_data(data, update=False):
     if not update:
         print("Altering data")
         chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
-        print(chat_data)
         msgs = chat_data.chats
         msg_index = len(msgs)
         msgs[msg_index] = data["data"]

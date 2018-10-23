@@ -85,11 +85,7 @@
                         receiver
                     };
                     await $set($.__chatID__, data)
-                } else {
-                    console.log("[indexedDB]Cache HIT")
                 }
-            } else {
-                console.log("[indexedDB]Cache MISS")
             }
         };
         const $user = $.id("__chat-with-prof");
@@ -384,7 +380,7 @@
                 };
             };
             messageContent.onclick = senderName.onclick = () => {
-                createChatBox(sender);
+                window.location = `/chat/${chatID}`;
             };
             setTimeout(() => {
                 box.style.marginTop = '15px';
@@ -419,7 +415,9 @@
     async function updatePageCache(parent_element = $.id("_msg_body")) {
         const data = await $get(chatid);
         let obj;
-        let _resp;
+        console.log("new template")
+        const template = document.createElement("div");
+        template.className = "chat_body"
         if (data) {
             const len = Object.keys(data).length;
             console.log("Checking For Updated Data")
@@ -436,10 +434,14 @@
                 const __msg__ = data[i];
                 if (__msg__) {
                     __msg__.msgid = i;
-                    console.log(`Parsing msgid: ${i} from cache`)
-                    await parse_message(parent_element, __msg__);
+                    await parse_message(template, __msg__);
                 }
             }
+            parent_element.replaceWith(template);
+            template.scrollTop = template.scrollHeight;
+            template.id = "_msg_body"
+            parent_element.remove()
+
             _resp = await fetchData(obj);
         } else {
             console.log("Fetching New")
@@ -456,10 +458,10 @@
         ////(_resp);
     }
 
-    function checkForMessages() {
+    async function checkForMessages() {
         console.log(`[-] Manually Checking For Messages [Periodic Timer:${periodicCheckTimer}]`)
-        updatePageCache();
-        setTimeout(checkForMessages, 20 * 1000)
+        await updatePageCache();
+        setTimeout(await checkForMessages, 20 * 1000)
     }
     async function resize(img, quality, mime_type) {
         const canvas = document.createElement('canvas');
@@ -572,7 +574,7 @@
             $.set(media_key, "class", "message-info-key");
             $.set(media_val, "class", "message-info-value");
             media_key.textContent = "Media Message";
-            media_val.innerHTML = "Click To Open Media Preview";
+            media_val.textContent = "Click To Open Media Preview";
             media_val.style.cursor = 'pointer'
             $.set(media_val, "data-media", media)
             slideout(media_val)
@@ -588,7 +590,7 @@
                 i.style.textDecoration = 'none';
                 i.target = "__blank";
                 i.style.display = 'block';
-                i.innerHTML = 'Click To Open Image In A New Tab';
+                i.textContent = 'Click To Open Image In A New Tab';
                 i.href = val.media
                 img.style.width = '160px';
                 img.style.height = '100px';
@@ -617,10 +619,10 @@
         }
         parseResponse(_data)
     };
-    ws.onopen = () => {
+    ws.onopen = async () => {
         console.log("Opened Socket")
         createChatBox(THERE);
-        checkForMessages();
+        await checkForMessages();
         (function keepAlivePings() {
             if (ws.readyState !== ws.CLOSED && ws.readyState !== ws.CLOSING) {
                 ws.send("ping");
