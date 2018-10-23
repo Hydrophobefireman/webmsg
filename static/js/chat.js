@@ -2,6 +2,8 @@
     (new Image).src = "/static/attachment.svg";
     (new Image).src = "/static/close.svg";
     (new Image).src = "/static/home.svg";
+    let firstrun;
+    firstrun = true;
     const $ = {
         q: (query, single_only = true) => {
             const _ = Array.from(document.querySelectorAll(query))
@@ -447,7 +449,11 @@
             }
             const _scroll = parent_element.scrollTop;
             parent_element.replaceWith(template);
-            template.scrollTop = _scroll;
+            if (firstrun) {
+                template.scrollTop = template.scrollHeight
+            } else {
+                template.scrollTop = _scroll;
+            }
             template.id = "_msg_body";
             template.onclick = () => {
                 toggle_menu()
@@ -643,9 +649,10 @@
         console.log("Opened Socket")
         createChatBox(THERE);
         await checkForMessages();
-        $.id("_msg_body").onclick = (() => {
+        firstrun = false;
+        $.id("_msg_body").onclick = () => {
                 toggle_menu()
-            })
+            }
             (function keepAlivePings() {
                 if (ws.readyState !== ws.CLOSED && ws.readyState !== ws.CLOSING) {
                     ws.send("ping");
