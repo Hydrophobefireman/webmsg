@@ -159,7 +159,12 @@
             const msg = document.querySelector(`div[data-msgid='${msid}']`);
             $.set(msg, "data-read", js.update.read);
             $.set(msg, 'data-rstamp', js.update.rstamp);
-
+            console.log("updating data")
+            const ___data___ = await $get(chatid);
+            const ___newdata___ = Object.assign({}, ___data___);
+            ___newdata___[msid].read = js.update.read;
+            ___newdata___[msid].rstamp = js.update.rstamp;
+            await $set(chatid, ___newdata___);
         }
         if (js.media) {
             const media_url = js.mediaURL;
