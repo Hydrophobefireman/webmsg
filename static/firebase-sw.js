@@ -11,6 +11,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 self.addEventListener("notificationclick", e => {
   const notification = e.notification;
+  console.log(notification)
   const data = notification.data;
   const chat_id = data.chat_id;
   e.notification.close();
@@ -25,11 +26,12 @@ messaging.setBackgroundMessageHandler(payload => {
   if (data.hasImage) {
     bod = "Media Message"
   } else {
-    bod = data.messageContent
+    bod = data.message
   }
   const notificationOptions = {
     requireInteraction: true,
     body: bod,
+    data,
     icon: "/favicon.ico"
   };
   if (data.hasImage) {

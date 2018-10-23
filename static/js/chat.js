@@ -238,7 +238,8 @@
         attach_btn.onclick = () => {
             const files = $.create("input");
             $.set(files, 'accept', 'image/*')
-            $.set(files, 'type', 'file')
+            $.set(files, 'type', 'file');
+            $menu.click()
             files.addEventListener("change", () => {
                 const f = files.files[0],
                     reader = new FileReader();
@@ -261,7 +262,7 @@
                             media: resp.url,
                             message: null,
                             receiver: u,
-                            sener: HERE,
+                            sender: HERE,
                             chat_id: chatid,
                             stamp: new Date().getTime()
                         };
@@ -328,7 +329,6 @@
             const messageContent = $.create("div");
             const actionBox = $.create("div");
             const replyBtn = $.create("span");
-            const markAsRead = $.create("span");
             const reply_inp = $.create("input");
             const sender = _data.sender;
             const text = _data.message;
@@ -340,15 +340,14 @@
             $.set(messageContent, "class", "notification-text");
             $.set(actionBox, "class", "notification-action-box");
             $.set(replyBtn, "class", "notification-action-button");
-            $.set(markAsRead, "class", "notification-action-button");
+
             box.appendChild(senderName);
             box.appendChild(messageContent);
             box.appendChild(actionBox);
             actionBox.appendChild(replyBtn);
-            actionBox.appendChild(markAsRead);
+
             senderName.textContent = sender;
             replyBtn.textContent = `Reply To ${sender}`;
-            markAsRead.textContent = "Mark As Read";
             if (isMedia) {
                 const img = new Image;
                 img.src = "/static/attachment.svg";
@@ -384,21 +383,6 @@
                     }
                 };
             };
-            markAsRead.onclick = () => {
-                const _read = {
-                    sender,
-                    receiver: HERE,
-                    chat_id: chatID,
-                    message: null,
-                    read: {
-                        id: _data.msgid
-                    },
-                    stamp: new Date().getTime(),
-                    rstamp: new Date().getTime(),
-                };
-                fetchData(_read)
-                box.remove()
-            }
             messageContent.onclick = senderName.onclick = () => {
                 createChatBox(sender);
             };

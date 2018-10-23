@@ -144,7 +144,6 @@ async def messenger():
             # keep alive for heroku
             await ws.send("pong")
         else:
-            print("json data?\n")
             try:
                 data = json.loads(__data)
             except:
@@ -273,7 +272,7 @@ async def messenger():
                 to_send = json.dumps({**chat_data["data"], "msgid": ind})
                 chat_data["msgid"] = ind
                 await _make_notify(session["user"], receiver, chat_data)
-                await ws.send(json.dumps(to_send))
+                await ws.send(to_send)
             else:
                 await ws.send(json.dumps({"error": "Bad request"}))
     if socket_obj:
@@ -310,7 +309,7 @@ async def logout():
 
 @app.route("/@/binary/", methods=["POST"])
 async def upload_bin():
-    data = request.data
+    data = await request.data
     resp = upload(data)
     return Response(
         json.dumps({"url": resp["secure_url"]}), content_type="application/octet-stream"
@@ -645,6 +644,8 @@ def verify_chat(u1, u2, idx):
 
 
 def create_chat_data(u1: str, u2: str) -> bool:
+    if u1 == u2:
+        return "NO"
     n1, n2 = sorted((u1, u2))
     data = chatData(u1=n1, u2=n2)
     if (
