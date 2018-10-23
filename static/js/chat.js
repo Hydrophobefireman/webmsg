@@ -459,6 +459,7 @@
     function checkForMessages() {
         console.log(`[-] Manually Checking For Messages [Periodic Timer:${periodicCheckTimer}]`)
         updatePageCache();
+        setTimeout(checkForMessages, 20 * 1000)
     }
     async function resize(img, quality, mime_type) {
         const canvas = document.createElement('canvas');
