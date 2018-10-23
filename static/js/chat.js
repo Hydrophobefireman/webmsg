@@ -196,6 +196,7 @@
         $.set($menubox, 'data-stat', 'closed');
         $.set($user, "class", "chat_with");
         $.set($menubox, 'class', 'menu-details');
+        $.set($menu, "id", "__menubox__")
         $.set($menu, 'class', 'menubox');
         $.set(txtbox, 'type', 'text');
         $.set(txtbox, 'placeholder', 'Type a Message');
@@ -633,7 +634,10 @@
 
     function toggle_menu() {
         const el = $.id("Nzk3NzEzOD");
-        el.click()
+        if ($.id("__menubox__").getAttribute("data-stat") === "opened") {
+            el.click()
+        }
+        return
     }
     ws.onopen = async () => {
         console.log("Opened Socket")
