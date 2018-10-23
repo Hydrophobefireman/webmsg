@@ -125,7 +125,6 @@
         if (js.media || js.message) {
             if ((js.sender !== HERE && js.receiver !== HERE) || (js.sender !== THERE && js.receiver !== THERE)) {
                 console.log(js)
-
                 throw new Error("Invalid Sender and recepient arguments")
             }
             if (!js.read && !js.rstamp && js.sender !== HERE) {
@@ -141,7 +140,7 @@
                     rstamp: new Date().getTime(),
 
                 };
-                const _t = await fetchData(_read);
+                await fetchData(_read);
                 ////(_t);
             }
         }
@@ -159,7 +158,8 @@
             const msid = js.msgid;
             const msg = document.querySelector(`div[data-msgid='${msid}']`);
             $.set(msg, "data-read", js.update.read);
-            $.set(msg, 'data-rstamp', js.update.rstamp)
+            $.set(msg, 'data-rstamp', js.update.rstamp);
+
         }
         if (js.media) {
             const media_url = js.mediaURL;

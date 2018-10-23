@@ -526,7 +526,10 @@ async def _make_notify(sender, receiver, chat_, read=False):
         try:
             if read:
                 return await _req_socket[0].send(json.dumps(chat_))
-            await _req_socket[0].send(json.dumps({**data, "msgid": chat_.get("msgid")}))
+            else:
+                await _req_socket[0].send(
+                    json.dumps({**data, "msgid": chat_.get("msgid")})
+                )
         except Exception as e:  # user disconnected?
             print(e)
     if not read:
