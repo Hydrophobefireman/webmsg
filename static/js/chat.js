@@ -193,6 +193,7 @@
             $menubox = $.create("div"),
             $menu = $.create("span"),
             close_btn = $.create("div"),
+            webrtcReq = $.create("div"),
             attach_btn = $.create("div");
         $user.id = "__chat-with-prof"
         $.set($menubox, 'data-stat', 'closed');
@@ -210,10 +211,12 @@
         $.set(img, 'class', 'context');
         $.set(close_btn, 'class', 'img-button-holder');
         $.set(attach_btn, 'class', 'img-button-holder');
+        $.set(webrtcReq, "class", "img-button-holder");
         $.set(txtbox, 'data-user', u);
-        bod.id = "_msg_body"
+        bod.id = "_msg_body";
         $menubox.appendChild(close_btn);
         $menubox.appendChild(attach_btn);
+        $menubox.appendChild(webrtcReq);
         head.appendChild($menu);
         head.appendChild($user);
         box.appendChild(head);
@@ -224,6 +227,7 @@
         boxwrap.appendChild(box);
         $menu.innerHTML = '&#9776;'
         $user.textContent = u;
+        webrtcReq.textContent = "Start WebRTC Session";
         results_all.appendChild(boxwrap);
         close_btn.onclick = () => {
             window.location = `/u/${HERE}`;
@@ -240,7 +244,7 @@
                 $menubox.style.marginBottom = '0px';
             }
         };
-
+        webrtcReq.onclick = async () => {};
         attach_btn.onclick = () => {
             const files = $.create("input");
             $.set(files, 'accept', 'image/*')
@@ -481,19 +485,6 @@
         await updatePageCache();
         setTimeout(await checkForMessages, 20 * 1000)
     }
-    async function resize(img, quality, mime_type) {
-        const canvas = document.createElement('canvas');
-        if (img.naturalWidth === undefined && img.naturalHeight === undefined) {
-            console.log(img, 'no natural width')
-            return null
-        }
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        const dataurl = canvas.toDataURL(mime_type, quality / 100);
-        const res = await fetch(dataurl);
-        return await res.arrayBuffer();
-    }
 
     function slidein(el) {
         el.style.overflow = 'hidden'
@@ -688,5 +679,18 @@
             console.log(e, "ERROR in parsing message");
             bod.innerHTML += '<br>An error occured Please reload the page'
         }
+    };
+    async function resize(img, quality, mime_type) {
+        const canvas = document.createElement('canvas');
+        if (img.naturalWidth === undefined && img.naturalHeight === undefined) {
+            console.log(img, 'no natural width')
+            return null
+        }
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        const dataurl = canvas.toDataURL(mime_type, quality / 100);
+        const res = await fetch(dataurl);
+        return await res.arrayBuffer();
     }
 }))()
