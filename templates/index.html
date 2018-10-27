@@ -7,7 +7,7 @@
     <title>WebMsg</title>
     <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
     <meta content="width=device-width, initial-scale=1" name="viewport" />
-    <link rel="stylesheet" href="/static/cssmin/index.css">
+    <link rel="stylesheet" href="/static/cssmin/main.css">
     <meta name="integrity" content="{{nonce}}" />
 </head>
 
@@ -23,8 +23,8 @@
             <div id='errors-and-notices' style="color:red"></div>
             <div id="lfbox" style="display: none">
                 <div data-action="/login/check/" id="login-form" method="POST" name="login-form">
-                    <input class="input_n" name="user" id="username-log" placeholder="Username" />
-                    <input class="input_n" name="password" id="password-log" placeholder="Password" type="password" />
+                    <input class="input_x" name="user" id="username-log" placeholder="Username" />
+                    <input class="input_x" name="password" id="password-log" placeholder="Password" type="password" />
                     <input style="display: none" type="submit" />
                 </div>
                 <button class="submit-button" id="login-btn">
@@ -34,9 +34,9 @@
             <div id="rfbox" style="display: none">
                 <div data-action="/register/check/" id="register-form" method="POST">
                     <div id="errors" style="color:red;visibility: hidden;height: 20px;"></div>
-                    <input class="input_n" id="username-reg" name="user" placeholder="Username" />
-                    <input class="input_n" name="password" id="password-reg" placeholder="Password" type="password" />
-                    <input class="input_n" name="checkpw" id="password-reg-conf" placeholder="Confirm password" type="password" />
+                    <input class="input_x" id="username-reg" name="user" placeholder="Username" />
+                    <input class="input_x" name="password" id="password-reg" placeholder="Password" type="password" />
+                    <input class="input_x" name="checkpw" id="password-reg-conf" placeholder="Confirm password" type="password" />
                     <input style="display: none" type="submit" />
                 </div>
                 <button class="submit-button" id="register-btn">

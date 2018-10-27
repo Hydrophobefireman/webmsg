@@ -1,87 +1,37 @@
-body {
-    font-family: 'Open Sans', sans-serif;
-    overflow: hidden;
+#signup:hover {
+    box-shadow: 2px 2px
 }
 
-#chat_wrap {
-    bottom: 0;
-    height: 100%;
-}
-
-.chat_box_wrap {
-    position: fixed;
-    bottom: 0;
-    height: 100%;
-    width: 100%;
-}
-
-.chat_box {
-    bottom: 0;
-    background: #fff;
-    border: 1px solid #e3e3e3;
-    margin-right: 8px;
-    height: 100%;
-}
-
-.chat_head {
-    z-index: 200;
-    top: 0;
-    transition: .3s ease-in-out;
-    border: 2px solid #e3e3e3;
-    border-radius: 16px;
-    min-height: 10px;
-    opacity: 1;
-    width: 95%;
-    left: 0;
-    right: 0;
-    margin: auto;
-    padding: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 20px;
-}
-
-.chat_body {
-    height: 85%;
-    overflow-y: scroll;
-    overflow-wrap: break-word;
-    overflow-x: hidden;
-}
-
-
-.chat_inp_box {
+#login {
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 4px;
+    border: 1px solid #6200ee;
+    outline: 0;
+    color: #6200ee;
+    text-transform: uppercase;
+    width: 80px;
     height: 30px;
-    outline: 0;
-    padding: 0;
-    position: absolute;
-    margin-bottom: 10px;
-    bottom: 0;
-    width: 100%;
+    margin: 10px;
+    cursor: pointer
 }
 
-.chat_inp {
-    width: 95%;
-    height: 15px;
+#signup {
+    color: #6200ee;
+    border-radius: 5px;
+    padding: 4px;
+    border: 1px solid #6200ee;
     outline: 0;
-    border: 1px solid #e3e3e3;
-    border-radius: 15px;
-    z-index: 2;
-    position: absolute;
-    bottom: 10px;
-    display: block;
-    padding: 8px;
+    background-color: #fff;
+    text-transform: uppercase;
+    width: 80px;
+    height: 30px;
+    margin: 10px;
+    cursor: pointer
 }
 
-.input_n {
-    background: 0;
-    border: 2px solid #e3e3e3;
-    color: #0000008a;
-    width: 50%;
-    outline: none;
-    padding: 8px;
-    border-radius: 10px;
-    margin: 5px;
+#login:hover {
+    box-shadow: 2px 2px #d9dce0
 }
 
 .submit-button {
@@ -90,8 +40,8 @@ body {
     -webkit-border-radius: 5px;
     border-radius: 5px;
     padding: 8px;
-    border: none;
-    outline: none;
+    border: 0;
+    outline: 0;
     background: #3367d6;
     color: white;
     cursor: pointer;
@@ -101,18 +51,7 @@ body {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    margin-top: 20px;
-}
-
-.result_names {
-    margin: 20px;
-    color: #000;
-}
-
-.box-s {
-    margin-left: auto;
-    margin-right: auto;
-    text-align: center
+    margin-top: 20px
 }
 
 .resbtn {
@@ -134,12 +73,117 @@ body {
     color: #fff
 }
 
+.result_names {
+    margin: 20px;
+    color: #000
+}
+
+.box-s {
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center
+}
+
+.input_x {
+    border: 0;
+    border-bottom: 1px solid #6200ee;
+    outline: 0;
+    width: 50%;
+    height: 20px;
+    padding: 8px
+}
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    overflow: hidden
+}
+
+#chat_wrap {
+    bottom: 0;
+    height: 100%
+}
+
+.chat_box_wrap {
+    position: fixed;
+    bottom: 0;
+    height: 100%;
+    width: 100%
+}
+
+.chat_box {
+    bottom: 0;
+    background: #fff;
+    border: 1px solid #e3e3e3;
+    margin-right: 8px;
+    height: 100%
+}
+
+.chat_head {
+    z-index: 200;
+    top: 0;
+    transition: .3s ease-in-out;
+    border: 2px solid #e3e3e3;
+    border-radius: 16px;
+    min-height: 10px;
+    opacity: 1;
+    width: 95%;
+    left: 0;
+    right: 0;
+    margin: auto;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px
+}
+
+.chat_body {
+    height: 85%;
+    overflow-y: scroll;
+    overflow-wrap: break-word;
+    overflow-x: hidden
+}
+
+.chat_inp_box {
+    height: 30px;
+    outline: 0;
+    padding: 0;
+    position: absolute;
+    margin-bottom: 10px;
+    bottom: 0;
+    width: 100%
+}
+
+.chat_inp {
+    width: 95%;
+    height: 15px;
+    outline: 0;
+    border: 1px solid #e3e3e3;
+    border-radius: 15px;
+    z-index: 2;
+    position: absolute;
+    bottom: 10px;
+    display: block;
+    padding: 8px
+}
+
+.input_n {
+    background: 0;
+    border: 2px solid #e3e3e3;
+    color: #0000008a;
+    width: 50%;
+    outline: 0;
+    padding: 8px;
+    border-radius: 10px;
+    margin: 5px
+}
+
 .menubox {
     user-select: none;
     cursor: pointer;
     font-size: 20px;
     left: 0;
-    margin-right: auto;
+    margin-right: auto
 }
 
 .menu-details {
@@ -159,23 +203,23 @@ body {
     margin: auto;
     margin-bottom: -250px;
     padding-top: 10px;
-    padding-bottom: 15px;
+    padding-bottom: 15px
 }
 
 .msg_sent {
-    background-color: #9900ff;
+    background-color: #90f;
     margin-left: auto;
-    text-align: right;
+    text-align: right
 }
 
 .chat_with {
     margin-right: auto;
-    cursor: pointer;
+    cursor: pointer
 }
 
 .msg_recieved {
     background-color: #2cb8ff;
-    margin-right: auto;
+    margin-right: auto
 }
 
 .msg {
@@ -191,7 +235,7 @@ body {
     cursor: pointer;
     text-align: left;
     overflow-wrap: break-word;
-    word-break: break-word;
+    word-break: break-word
 }
 
 .img-button-holder {
@@ -199,11 +243,11 @@ body {
     border-radius: 20px;
     background-color: #55a6ef5c;
     margin-top: 5px;
-    transition: 0.3s ease-in-out;
+    transition: .3s ease-in-out;
     padding: 8px;
     cursor: pointer;
     user-select: none;
-    font-weight: bold;
+    font-weight: bold
 }
 
 .img-button-holder:hover,
@@ -221,13 +265,13 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    transition: 0.4s ease-in-out;
+    transition: .4s ease-in-out;
     word-break: break-all;
     display: none;
     background: #fff;
     border: 2px solid #e3e3e3;
     border-radius: 15px;
-    overflow: hidden;
+    overflow: hidden
 }
 
 .message-info-key {
@@ -239,45 +283,44 @@ body {
     padding: 5px;
     border: 2px solid #e3e3e3;
     border-radius: 10px;
-    transition: 0.3s ease-in-out;
+    transition: .3s ease-in-out
 }
 
 .message-info-key:hover,
 .message-info-value:hover,
 .message-info-key:active,
 .message-info-value:active {
-    background-color: #4285f4b0;
+    background-color: #4285f4b0
 }
 
 .message-close {
     user-select: none;
     font-weight: bolder;
     font-size: 19px;
-    cursor: pointer;
+    cursor: pointer
 }
 
 .message-info-value {
     display: block;
     margin: auto;
-    border: none;
+    border: 0;
     text-align: center;
-    padding: 0px;
+    padding: 0;
     height: 0;
     cursor: pointer;
     user-select: none;
     opacity: 0;
-    transition: 0.3s ease-in-out;
+    transition: .3s ease-in-out;
     border-radius: 10px;
     font-weight: bold;
-    width: 0;
+    width: 0
 }
 
 .notification-action-button {
     margin-left: 15px;
     font-weight: bold;
     color: #138fd0;
-    cursor: pointer;
-
+    cursor: pointer
 }
 
 .notification-action-box {
@@ -286,12 +329,12 @@ body {
 
 .notification-text {
     overflow: hidden;
-    word-break: unset;
+    word-break: unset
 }
 
 .notification-sender {
     font-weight: bolder;
-    overflow: hidden;
+    overflow: hidden
 }
 
 .notification-box {
@@ -307,7 +350,7 @@ body {
     background: #fff;
     width: 95%;
     padding: 15px;
-    margin-top: -1000px;
+    margin-top: -1000px
 }
 
 .notification-reply-bar {
@@ -317,5 +360,5 @@ body {
     padding: 5px;
     width: 90%;
     color: #fff;
-    outline: none;
+    outline: 0
 }

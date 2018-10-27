@@ -1,15 +1,18 @@
+import hashlib
 import json
 import os
 import re
 import secrets
+import shutil
 import time
+from functools import wraps
 from urllib.parse import urlparse
-import envs
+
 import cloudinary.uploader
 import passlib.hash as pwhash
-
-# import requests
-# from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup as bs
+from flask_sqlalchemy import SQLAlchemy
+from htmlmin.minify import html_minify
 from quart import (
     Quart,
     Response,
@@ -18,15 +21,14 @@ from quart import (
     redirect,
     render_template,
     request,
-    websocket,
     send_from_directory,
     session,
+    websocket,
 )
-from flask_sqlalchemy import SQLAlchemy
-from functools import wraps
-from htmlmin.minify import html_minify
 from sqlalchemy import or_
 from sqlalchemy.orm.attributes import flag_modified
+
+import envs
 from flask_tools import flaskUtils
 from notificationmanager import notify
 
@@ -34,6 +36,10 @@ app = Quart(__name__)
 flaskUtils(app)
 app.secret_key = "GI4cEwO7e2g-Hc6jpo-StrXyRi_Qx8PTrCzzSfiR"
 dburl = os.environ.get("DATABASE_URL")
+
+scripts_dir = os.path.join(app.root_path, "static", "dist")
+if not os.path.isdir(scripts_dir):
+    os.mkdir(scripts_dir)
 
 
 def open_and_read(fn: str, mode: str = "r", strip: bool = True):
@@ -320,7 +326,9 @@ async def main():
         session["logged_in"] = False
     if session.get("logged_in"):
         return redirect(f"/u/{session['user']}/?auth=1")
-    return html_minify(await render_template("index.html", nonce=session["u-id"]))
+    return parse_local_assets(
+        html_minify(await render_template("index.html", nonce=session["u-id"]))
+    )
 
 
 @app.route("/login/check/", methods=["GET", "POST"])
@@ -465,8 +473,10 @@ async def userpages(user):
         return redirect("/?auth=0")
     session["u-id"] = secrets.token_urlsafe(30)
     if session["user"] == user:
-        return html_minify(
-            await render_template("user.html", nonce=session["u-id"], user=user)
+        return parse_local_assets(
+            html_minify(
+                await render_template("user.html", nonce=session["u-id"], user=user)
+            )
         )
     else:
         return redirect(f'/u/{session["user"]}')
@@ -483,8 +493,10 @@ async def make_chat_(chat_id):
     there = data.user1 if not data.user1 == session["user"] else data.user2
     if not session.get("logged_in") or not session.get("user") == here:
         return "NO", 403
-    return html_minify(
-        await render_template("chat.html", here=here, there=there, chat_id=chat_id)
+    return parse_local_assets(
+        html_minify(
+            await render_template("chat.html", here=here, there=there, chat_id=chat_id)
+        )
     )
 
 
@@ -565,6 +577,47 @@ def validate_stamp(stamp: int) -> int:
     ):
         return time.time() * 1000
     return abs(int(stamp)) if isinstance(stamp, str) else abs(stamp)
+
+
+def parse_local_assets(html):
+    soup = bs(html, "html5lib")
+    assets = soup.find_all(
+        lambda x: (x.name == "script" and x.attrs.get("src", "").startswith("/"))
+        or (
+            x.name == "link" and x.attrs.get("href", "").startswith("/")
+        )  # Relative urls
+    )
+    for data in assets:
+        ftype = data.name
+        attr, ext = ("src", ".js") if ftype == "script" else ("href", ".css")
+        src = data.attrs.get(attr)
+        print(f"Parsing asset->{src}")
+        if src.startswith("/"):
+            src = src[1:]
+        _file = os.path.join(app.root_path, src)
+        checksum = checksum_f(_file)
+        name = checksum + ext
+        location = os.path.join("static", "dist", name)
+        if os.path.isfile(os.path.join(app.root_path, location)):
+            print("No change in file..skipping")
+            continue
+        print("New Source:", location)
+        shutil.copyfile(_file, os.path.join(app.root_path, location))
+        data.attrs[attr] = f"/{location}"
+    return str(soup)
+
+
+def checksum_f(filename, meth="sha256"):
+    foo = getattr(hashlib, meth)()
+    _bytes = 0
+    total = os.path.getsize(filename)
+    with open(filename, "rb") as f:
+        while _bytes <= total:
+            f.seek(_bytes)
+            chunk = f.read(1024 * 4)
+            foo.update(chunk)
+            _bytes += 1024 * 4
+    return foo.hexdigest()
 
 
 def check_password_hash(_hash, pw):
@@ -693,12 +746,3 @@ def alter_chat_data(data, update=False):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", use_reloader=True)
-
-"""    if istyping:
-        _notif = {"message": None, "typing": True, "stamp": tstamp}
-        _chat_data = {"chat_id": chat_id, "data": _notif}
-        _m a k e     _notify(sender, receiver, _chat_data)
-        return Response(
-            json.dumps({"stat": "Success"}), content_type="application/json"
-        )
-"""
