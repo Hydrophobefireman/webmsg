@@ -89,6 +89,7 @@
     async function _paintUserPage(params) {
         const __u = params[0];
         $.empty(root);
+        root.textContent = "Loading";
         const user = await app.getUser();
         if (!user) {
             trace("Not Logged In..redirecting to '/'")
@@ -150,6 +151,7 @@
         const prevChats = $.create("div", {
             id: "prev-chats"
         });
+        root.innerHTML = '';
         root.appendChild(searchbox);
         root.appendChild(results);
         root.appendChild(resultsAll);
@@ -269,10 +271,10 @@
         periodicCheckTimer = 10000;
         async function parse_message(parent_element, js) {
             async function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp, media = null) {
-                let msg_class;
                 if ($.q(`div[data-msgid='${msgid}']`)) {
-                    return trace(`Element with ID:${msgid} already exists..skipping`)
+                    return;
                 }
+                let msg_class;
                 const msg = $.create("div");
                 if (sender === HERE) {
                     msg_class = 'msg_sent'
@@ -567,22 +569,9 @@
                     const __msg__ = data[i];
                     if (__msg__) {
                         __msg__.msgid = i;
-                        await parse_message(template, __msg__);
+                        await parse_message(parent_element, __msg__);
                     }
                 }
-                const _scroll = parent_element.scrollTop;
-                parent_element.replaceWith(template);
-                if (firstrun) {
-                    template.scrollTop = template.scrollHeight
-                } else {
-                    template.scrollTop = _scroll;
-                }
-                template.id = "_msg_body";
-                template.onclick = () => {
-                    toggle_menu()
-                }
-                parent_element.remove()
-
                 _resp = await __CurrSocketFetch(obj);
             } else {
                 console.log("Fetching New")
