@@ -270,6 +270,9 @@
         async function parse_message(parent_element, js) {
             async function make_message_box(box, message, sender, receiver, stamp, msgid, read, rstamp, media = null) {
                 let msg_class;
+                if ($.q(`div[data-msgid='${msgid}']`)) {
+                    return trace(`Element with ID:${msgid} already exists..skipping`)
+                }
                 const msg = $.create("div");
                 if (sender === HERE) {
                     msg_class = 'msg_sent'
@@ -289,8 +292,7 @@
                 } else {
                     $.set(msg, "data-media", null)
                     msg.textContent = message;
-                }
-
+                };
                 $.set(msg, "data-sender", sender);
                 $.set(msg, "data-receiver", receiver);
                 $.set(msg, "data-stamp", stamp);
