@@ -15,7 +15,7 @@ self.addEventListener("notificationclick", e => {
   const data = notification.data;
   const chat_id = data.chat_id;
   e.notification.close();
-  e.waitUntil(clients.openWindow(`/chat/${chat_id}`));
+  e.waitUntil(clients.openWindow(`/#/chat/${chat_id}`));
 })
 messaging.setBackgroundMessageHandler(payload => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
