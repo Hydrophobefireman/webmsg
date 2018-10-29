@@ -16,6 +16,18 @@
     cursor: pointer
 }
 
+.__messages__ {
+    height: 20px;
+    color: red;
+    visibility: hidden
+}
+
+#__errs__ {
+    color: red;
+    visibility: hidden;
+    height: 20px;
+}
+
 #signup {
     color: #6200ee;
     border-radius: 5px;
@@ -34,6 +46,16 @@
     box-shadow: 2px 2px #d9dce0
 }
 
+#loading-gif {
+    height: 20px;
+    display: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
 .submit-button {
     text-transform: uppercase;
     -moz-border-radius: 5px;
@@ -46,11 +68,11 @@
     color: white;
     cursor: pointer;
     -webkit-touch-callout: none;
+    user-select: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
-    user-select: none;
     margin-top: 20px
 }
 
@@ -78,7 +100,8 @@
     color: #000
 }
 
-.box-s {
+.box-s,
+.center {
     margin-left: auto;
     margin-right: auto;
     text-align: center
@@ -180,6 +203,10 @@ body {
 
 .menubox {
     user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     cursor: pointer;
     font-size: 20px;
     left: 0;
@@ -247,6 +274,10 @@ body {
     padding: 8px;
     cursor: pointer;
     user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     font-weight: bold
 }
 
@@ -277,6 +308,10 @@ body {
 .message-info-key {
     display: block;
     user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     margin: auto;
     cursor: pointer;
     text-align: center;
@@ -295,6 +330,10 @@ body {
 
 .message-close {
     user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     font-weight: bolder;
     font-size: 19px;
     cursor: pointer
@@ -309,6 +348,10 @@ body {
     height: 0;
     cursor: pointer;
     user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     opacity: 0;
     transition: .3s ease-in-out;
     border-radius: 10px;

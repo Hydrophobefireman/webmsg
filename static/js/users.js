@@ -18,20 +18,20 @@
             create: (el) => document.createElement(el),
             set: (obj, attr, val) => obj.setAttribute(attr, val)
         },
-        inp = $.id('users'),
-        submit = $.id('sbm'),
+        inputUsers = $.id('users'),
+        searchButton = $.id('sbm'),
         nonce = document.querySelector("meta[name='nonce']").getAttribute('content'),
         img = $.id('loading-gif'),
         messages = $.id('messages'),
-        results_all = $.id('results-all'),
-        HERE = $.id("username_meta").content;
+        resultsAll = $.id('results-all'),
+        user = $.id("username_meta").content;
     rdetails = $.id('resbox-details');
     img.oncontextmenu = e => {
         e.preventDefault()
     }
-    inp.addEventListener("keydown", e => {
+    inputUsers.addEventListener("keydown", e => {
         if (e.keyCode === 13) {
-            submit.click()
+            searchButton.click()
         }
     });
     const urlencode = json => {
@@ -42,10 +42,10 @@
 
     function paint_page(data) {
         const js = data.users;
-        results_all.innerHTML = "<div>Search Result</div>";
-        results_all.style.display = 'block';
+        resultsAll.innerHTML = "<div>Search Result</div>";
+        resultsAll.style.display = 'block';
         if (js.length === 0) {
-            return results_all.innerHTML = 'No Results Found'
+            return resultsAll.innerHTML = 'No Results Found'
         }
         for (const i of js) {
             const a = $.create("a"),
@@ -56,15 +56,15 @@
             $.set(a, "data-chat_id", i.chat_id)
             a.href = `/chat/${i.chat_id}`
             btn.className = 'resbtn'
-            results_all.appendChild(a);
+            resultsAll.appendChild(a);
             a.style.textDecoration = 'none';
             a.style.color = "#000";
             a.style.display = 'block';
         }
     };
-    submit.onclick = async () => {
+    searchButton.onclick = async () => {
         messages.style.visibility = 'hidden';
-        if (inp.value.length == 0) {
+        if (inputUsers.value.length == 0) {
             return
         } else {
             rdetails.style.display = 'block';
@@ -82,7 +82,7 @@
                 },
                 body: urlencode({
                     token,
-                    user: inp.value
+                    user: inputUsers.value
                 })
             });
             img.style.display = 'none';
@@ -174,7 +174,7 @@
                                 message: value,
                                 media: null,
                                 stamp,
-                                sender: HERE,
+                                sender: user,
                                 chat_id: chatID
                             };
 

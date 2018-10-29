@@ -24,7 +24,7 @@
                 }
             }
         },
-        notices = $.id('errors-and-notices');
+        errsAndNotices = $.id('errors-and-errsAndNotices');
     String.prototype.isValid = function () {
         if (this.length > 0) {
             return /^[0-9a-zA-Z_.-]+$/.test(this);
@@ -41,9 +41,9 @@
         const pass = $.id('password-reg').value,
             pass_conf = $.id('password-reg-conf').value;
         if (pass !== pass_conf) {
-            return notices.innerHTML = 'Passwords Do Not Match!';
+            return errsAndNotices.innerHTML = 'Passwords Do Not Match!';
         } else {
-            notices.innerHTML = 'Loading'
+            errsAndNotices.innerHTML = 'Loading'
             const data = await fetch("/register/check/", {
                 credentials: 'include',
                 headers: {
@@ -62,21 +62,21 @@
                 if (data.status === 403) {
                     const possibiliies = _responses.register,
                         text = possibiliies[resp.error];
-                    notices.innerHTML = text;
+                    errsAndNotices.innerHTML = text;
                 } else if (data.status !== 200) /*expecting a 50x error*/ {
-                    notices.innerHTML = 'An Error Occured..please reload the page and try again'
+                    errsAndNotices.innerHTML = 'An Error Occured..please reload the page and try again'
                 } else {
-                    notices.innerHTML = 'Account Created. Please Login';
+                    errsAndNotices.innerHTML = 'Account Created. Please Login';
                 }
             } catch (e) {
                 console.log(e);
-                return notices.innerHTML = 'An Error Occured..please reload the page and try again'
+                return errsAndNotices.innerHTML = 'An Error Occured..please reload the page and try again'
             }
 
         }
     })
     loginbtn.addEventListener('click', async () => {
-        notices.innerHTML = 'Loading'
+        errsAndNotices.innerHTML = 'Loading'
         const data = await fetch("/login/check/", {
             credentials: 'include',
             method: 'post',
@@ -94,15 +94,15 @@
             if (data.status === 403) {
                 const possibiliies = _responses.login,
                     text = possibiliies[resp.error];
-                notices.innerHTML = text;
+                errsAndNotices.innerHTML = text;
             } else if (data.status !== 200) /*expecting a 50x error*/ {
-                notices.innerHTML = 'An Error Occured..please reload the page and try again'
+                errsAndNotices.innerHTML = 'An Error Occured..please reload the page and try again'
             } else {
                 window.location.replace(`/u/${resp.user}`)
             }
         } catch (e) {
             console.log(e);
-            return notices.innerHTML = 'An Error Occured..please reload the page and try again'
+            return errsAndNotices.innerHTML = 'An Error Occured..please reload the page and try again'
         }
     });
     $.id('password-log').addEventListener('keydown', (e) => {

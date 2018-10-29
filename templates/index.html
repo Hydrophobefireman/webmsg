@@ -5,49 +5,22 @@
     <meta charset="utf-8" />
     <meta content="IE=edge" http-equiv="X-UA-Compatible" />
     <title>WebMsg</title>
-    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+    <link rel="manifest" href="/static/manifest.json">
     <meta content="width=device-width, initial-scale=1" name="viewport" />
-    <link rel="stylesheet" href="/static/cssmin/main.css">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+    <link rel="stylesheet" href="static/cssmin/main.css">
+    <script src="/static/jsmin/idb.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/5.5.5/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/5.5.5/firebase-messaging.js"></script>
+    <script src="/static/jsmin/firebaseRegister.js"></script>
     <meta name="integrity" content="{{nonce}}" />
 </head>
 
 <body>
-    <div style="margin:auto;text-align: center;">
-        <div class="main">
-            <button id="login">
-                Login
-            </button>
-            <button id="signup">
-                Signup
-            </button>
-            <div id='errors-and-notices' style="color:red"></div>
-            <div id="lfbox" style="display: none">
-                <div data-action="/login/check/" id="login-form" method="POST" name="login-form">
-                    <input class="input_x" name="user" id="username-log" placeholder="Username" />
-                    <input class="input_x" name="password" id="password-log" placeholder="Password" type="password" />
-                    <input style="display: none" type="submit" />
-                </div>
-                <button class="submit-button" id="login-btn">
-                    Login
-                </button>
-            </div>
-            <div id="rfbox" style="display: none">
-                <div data-action="/register/check/" id="register-form" method="POST">
-                    <div id="errors" style="color:red;visibility: hidden;height: 20px;"></div>
-                    <input class="input_x" id="username-reg" name="user" placeholder="Username" />
-                    <input class="input_x" name="password" id="password-reg" placeholder="Password" type="password" />
-                    <input class="input_x" name="checkpw" id="password-reg-conf" placeholder="Confirm password" type="password" />
-                    <input style="display: none" type="submit" />
-                </div>
-                <button class="submit-button" id="register-btn">
-                    Signup
-                </button>
-            </div>
-        </div>
-        <script src="/static/jsmin/index.js"></script>
+    <div class="center">
+        <div id="app-root"></div>
     </div>
-
-
+    <script src="/static/jsmin/app.js"></script>
 </body>
 
 </html>
