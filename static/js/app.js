@@ -542,7 +542,7 @@
 
         async function updatePageCache(parent_element = $.id("_msg_body")) {
             if (app.currentFuncRoute() !== "chat") {
-                trace("Removed Chat Context->")
+                return trace("Removed Chat Context->")
             }
             const data = await $get(chatid);
             let obj;

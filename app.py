@@ -257,6 +257,7 @@ async def login():
         resp = await make_response(
             json.dumps({"success": "authenticated", "user": udata.user})
         )
+        code = 200
     else:
         session["logged_in"] = False
         resp = await make_response(json.dumps({"error": "incorrect_password"}))
