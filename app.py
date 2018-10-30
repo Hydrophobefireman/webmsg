@@ -217,7 +217,6 @@ async def get_chat_ids():
 
 @app.route("/api/integrity/", methods=["POST"], strict_slashes=False)
 async def api_integ():
-    form = await request.form
     session.permanent = True
     session.pop("u-id")
     session["u-id"] = secrets.token_urlsafe(20)
@@ -346,7 +345,10 @@ def collect_websocket(func):
         try:
             return await func(*args, **kwargs)
         except Exception as e:
-            app.__sockets__.remove(_obj)
+            try:
+                app.__sockets__.remove(_obj)
+            except:
+                print("Couldn't remove:", _obj)
             print(f"Removing {_obj.__user__}")
             raise e
 

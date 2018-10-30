@@ -2,10 +2,6 @@
     (new Image).src = "/static/attachment.svg";
     (new Image).src = "/static/close.svg";
     (new Image).src = "/static/home.svg";
-
-    function traceData() {
-        return [...Array(15)].map(_ => (~~(Math.random() * 36)).toString(36)).join('')
-    };
     let noNotifications;
     const urlencode = json => {
         return `${Object.keys(json).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(json[key])}`).join('&')}`;
@@ -62,16 +58,13 @@
                 return _
             }
         },
-        create: (e, attrs, debug = true) => {
+        create: (e, attrs) => {
             const el = document.createElement(e);
             if (typeof attrs === "object") {
                 const keys = Object.keys(attrs);
                 for (const i of keys) {
                     el.setAttribute(i, attrs[i])
                 }
-            }
-            if (debug) {
-                el.setAttribute("data-trace", traceData())
             }
             return el;
         },
@@ -241,7 +234,11 @@
                 a.appendChild(btn);
                 $.set(a, 'data-user', i.user)
                 $.set(a, "data-chat_id", i.chat_id)
-                btn.onclick = () => window.location.href = `/#/chat/${i.chat_id}`; //refresh chat context
+                btn.onclick = () => {
+                    window.location.href = `/#/chat/${i.chat_id}`;
+                    window.location.reload();
+                }
+                //refresh chat context
                 btn.className = 'resbtn'
                 prevChats.appendChild(a);
             }
@@ -468,6 +465,9 @@
             webrtcReq.textContent = "Start WebRTC Session";
             results_all.appendChild(boxwrap);
             close_btn.onclick = () => {
+                if (typeof ws === "object") {
+                    ws.close()
+                }
                 app.route(`/u/${HERE}`);
             };
             $menu.id = "Nzk3NzEzOD"
