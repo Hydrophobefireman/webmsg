@@ -611,7 +611,7 @@ def resolve_local_url(url):
 
 
 def parse_local_assets(html):
-    soup = bs(html, "html5lib")
+    soup = bs(html, "html.parser")
     assets = soup.find_all(
         lambda x: (
             x.name == "script"
@@ -781,6 +781,7 @@ def alter_chat_data(data, update=False):
     # pylint: enable=E1101
 
 
+# for heroku nginx
 open("/tmp/app-initialized", "w").close()
 
 if __name__ == "__main__":
