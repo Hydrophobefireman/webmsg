@@ -9,7 +9,6 @@ events {
 	worker_connections 1024;
 }
 http {
-
 	server_tokens off;
 	gzip on;
 	gzip_comp_level 7;
@@ -18,6 +17,8 @@ http {
 	gzip_proxied any;
 	gzip_types text/plain text/css application/json application/javascript application/x-javascript text/javascript text/xml application/xml application/rss+xml application/atom+xml image/svg+xml application/rdf+xml;
 	log_format l2met 'USER_AGENT=$http_user_agent X-Forwarded-For=$http_x_forwarded_for Scheme:$scheme';
+	access_log logs/nginx/access.log l2met;
+	error_log logs/nginx/error.log;
 	include mime.types;
 	default_type application/octet-stream;
 	sendfile on;
@@ -37,27 +38,23 @@ http {
 		server_name _;
 		keepalive_timeout 5;
 		add_header	X-Frame-Options "SAMEORIGIN";
-		pagespeed on;
-		pagespeed FileCachePath "/tmp/pagespeed/";
-		brotli_static	on;
-		brotli on;
-		brotli_types	text/plain text/css application/json application/javascript application/x-javascript text/javascript text/xml application/xml application/rss+xml application/atom+xml image/svg+xml application/rdf+xml;
-		brotli_comp_level	7;
-		pagespeed XHeaderValue "Speedy";
-		pagespeed PreserveUrlRelativity on;
-		pagespeed LowercaseHtmlNames on;
-		pagespeed ModifyCachingHeaders off;
-		pagespeed AvoidRenamingIntrospectiveJavascript off;
-		pagespeed MaxCacheableContentLength -1;
+		pagespeed 	on;
+		pagespeed 	FileCachePath "/tmp/pagespeed/";
+		pagespeed 	XHeaderValue "Speedy";
+		pagespeed 	PreserveUrlRelativity on;
+		pagespeed 	LowercaseHtmlNames on;
+		pagespeed 	ModifyCachingHeaders off;
+		pagespeed 	AvoidRenamingIntrospectiveJavascript off;
+		pagespeed 	MaxCacheableContentLength -1;
 		pagespeed FetchHttps enable;
 		pagespeed RespectXForwardedProto on;
-		# pagespeed javascript experiment
-		pagespeed UseExperimentalJsMinifier on;
-
-		# pagespeed default filters
+	# pagespeed javascript experiment
+		pagespeed 	UseExperimentalJsMinifier on;
+	
+	# pagespeed default filters
 		pagespeed	RewriteLevel CoreFilters;
-
-		# pagespeed filters
+	
+	# pagespeed filters
 		pagespeed CriticalImagesBeaconEnabled false;#beacons get blocked by ublock...i dont want that
 		pagespeed EnableFilters responsive_images;
 		pagespeed EnableFilters outline_javascript,lazyload_images;
@@ -68,20 +65,18 @@ http {
 
 		# pagespeed handlers
 
+		
 		location / {
-
 			proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 			proxy_set_header Host $http_host;
 			proxy_redirect off;
 			proxy_pass http://app_server;
-		}
+		}		
 		location /static/ {
-
 			alias /app/static/;
 			try_files $uri =404;
-		}
+		}	
 		location /get-cached/x/ {
-
 			autoindex on;
 			sendfile on;
 			alias /app/saves/;
@@ -90,3 +85,4 @@ http {
 	}
 }
 
+	
