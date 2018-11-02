@@ -7,7 +7,6 @@ import shutil
 import time
 from functools import wraps
 from urllib.parse import urlparse
-
 import cloudinary.uploader
 import passlib.hash as pwhash
 from bs4 import BeautifulSoup as bs
@@ -781,6 +780,8 @@ def alter_chat_data(data, update=False):
         return True
     # pylint: enable=E1101
 
+
+open("/tmp/app-initialized", "w").close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", use_reloader=True)
