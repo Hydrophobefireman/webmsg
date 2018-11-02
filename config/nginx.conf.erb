@@ -17,8 +17,7 @@ http {
 	gzip_proxied any;
 	gzip_types text/plain text/css application/json application/javascript application/x-javascript text/javascript text/xml application/xml application/rss+xml application/atom+xml image/svg+xml application/rdf+xml;
 	log_format l2met 'USER_AGENT=$http_user_agent X-Forwarded-For=$http_x_forwarded_for Scheme:$scheme';
-	access_log logs/nginx/access.log l2met;
-	error_log logs/nginx/error.log;
+	access_log error l2met;
 	include mime.types;
 	default_type application/octet-stream;
 	sendfile on;
