@@ -7,6 +7,7 @@ import shutil
 import time
 from functools import wraps
 from urllib.parse import urlparse
+
 import cloudinary.uploader
 import passlib.hash as pwhash
 from bs4 import BeautifulSoup as bs
@@ -16,13 +17,13 @@ from quart import (
     Quart,
     Response,
     abort,
+    jsonify,
     make_response,
     redirect,
     render_template,
     request,
     send_from_directory,
     session,
-    jsonify,
     websocket,
 )
 from sqlalchemy import or_
@@ -159,13 +160,6 @@ async def api_tools():
     return session["user"]
 
 
-@app.route("/deb")
-async def sessions__():
-    app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
-    print(session)
-    return jsonify(dict(session))
-
-
 @app.route("/api/chat_ids/", methods=["POST"])
 async def get_previous_chats():
     _idx = await request.form
@@ -193,7 +187,6 @@ async def get_previous_chats():
 async def get_chat_ids():
     content_type = "application/octet-stream"
     form = await request.form
-    print(form)
     idx = form.get("chat_id")
     if not idx or not session.get("logged_in") or not session.get("user"):
         return Response(
@@ -333,7 +326,7 @@ def collect_websocket(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
         _obj = websocket._get_current_object()
-        setattr(_obj, "__user__", session["user"])
+        setattr(_obj, "__user__", session.get("user"))
         tr = []
         for i in app.__sockets__:
             if i.__user__ == session["user"]:
@@ -354,149 +347,201 @@ def collect_websocket(func):
     return wrapper
 
 
+class WebsocketResponder:
+    def __init__(self, ws_obj: websocket) -> None:
+        self.socket = ws_obj
+        self._req = {}
+        self.user = None
+
+    async def _send_message(self, message: [dict, str]) -> None:
+        if isinstance(message, str):
+            return await self.socket.send(message)
+        elif isinstance(message, dict):
+            return await self.socket.send(json.dumps(message))
+        else:
+            raise TypeError("Only dict and str tpes are supported")
+
+    async def parse_request(self, data: str) -> None:
+        if data == "ping":
+            return await self._send_message("pong")
+        try:
+            self._req = json.loads(data)
+            return self._req
+        except:
+            return await self._send_message({"error": "Bad request"})
+
+    async def cred_check(self, _session) -> None:
+        if not session.get("user") or not session.get("logged_in"):
+            await self._send_message(
+                {"error": "Not Authenticated..did you clear your cookies?"}
+            )
+            return False
+        self.user = session["user"]
+        return True
+
+    async def validate_message(self):
+        has_falsey, falsey_vals = has_false_types(
+            self._req, ("sender", "receiver", "chat_id", "message", "stamp")
+        )
+        if has_falsey:
+            await self._send_message(
+                {"error": f"No values provided for :{force_join(falsey_vals)} ."}
+            )
+            return False
+        await self._parse_message()
+
+    async def _parse_message(self):
+        data = self._req
+        self.sender = data["sender"]
+        self.receiver = data["receiver"]
+        self.chat_id = data["chat_id"]
+        self.message = data["message"]
+        self.tstamp = validate_stamp(data["stamp"])
+        self.fetch = data.get("fetch_messages")
+        self.fetch_from = data.get("fetch_from")
+        self.read = data.get("read")
+        self.seen_read = data.get("seen_read")
+        self.media = data.get("media")
+        self.chat_data = None
+        if (not self.user == self.sender and not self.user == self.receiver) or (
+            self.sender == self.receiver
+        ):
+            return await self._send_message(
+                {"error": f"Invalid sender value {self.sender}"}
+            )
+        chat = verify_chat(self.sender, self.receiver, self.chat_id)
+        if not chat:
+            return await self._send_message({"error": "Invalid Chat"})
+        self.__chat__ = chat
+        await self._conditional_responses()
+
+    async def _conditional_responses(self):
+        if self.message:
+            return await self._text_reply(text=True)
+        if self.media:
+            return await self._text_reply(text=False, _media=True)
+        if self.fetch:
+            full_fetch = not self.fetch_from and not self.fetch_from == 0
+            return await self._send_message(await self._parse_fetches(full_fetch))
+        if self.read and not self.sender == self.user:
+            return await self._send_message(await self._read_response())
+        if self.seen_read and self.sender == self.user:
+            return await self._send_message(await self._update_read_stat())
+        return await self._send_message({"error": "Bad request"})
+
+    async def _update_read_stat(self):
+        data = self.seen_read
+        if self.receiver == self.user:
+            return {"error": "invalid receiver..for seen_stats"}
+        idx = data.get("id")
+        chat_data = {
+            "chat_id": self.chat_id,
+            "msgid": idx,
+            "update": {"seen_read": True},
+        }
+        alter_chat_data(chat_data, rstats=True)
+        return {"success": "ok"}
+
+    async def _read_response(self):
+        if self.sender == self.user:
+            return {"error": "invalid sender..for read receipt"}
+        data = self.read
+        msgs = self.__chat__.chats
+        idx = data.get("id")
+        part_msg = msgs.get(idx)
+        if not part_msg:
+            return {"error": "No Such Message."}
+        part_msg["read"] = True
+        msgs[idx] = part_msg
+        chat_data = {
+            "chat_id": self.chat_id,
+            "msgid": idx,
+            "update": {"read": True, "rstamp": self.tstamp},
+        }
+        alter_chat_data(chat_data, read=True)
+        await _make_notify(self.sender, self.receiver, chat_data, True)
+        return {"success": "ok"}
+
+    async def _parse_fetches(self, full):
+        _data = {"fetch": True}
+        chat_data = check_chat_data(id_=self.chat_id).chats
+        if full:
+            _data["data"] = chat_data
+            _data["full_fetch"] = True
+        else:
+            tsend = self.get_data_from(chat_data, self.fetch_from)
+            _data["data"] = tsend
+            _data["full_fetch"] = False
+            _data["fetched_from"] = self.fetch_from + 1
+        return _data
+
+    async def _text_reply(self, text=True, _media=None):
+        chat_data = {
+            "chat_id": self.chat_id,
+            "data": {
+                "message": None,
+                "media": False,
+                "mediaURL": None,
+                "sender": self.sender,
+                "receiver": self.receiver,
+                "stamp": self.tstamp,
+                "read": False,
+                "rstamp": None,
+            },
+        }
+        if text:
+            chat_data["data"]["message"] = self.message
+        elif _media:
+            chat_data["data"]["media"] = True
+            chat_data["data"]["mediaURL"] = self.media
+        ind = alter_chat_data(chat_data, new_message=True)
+        to_send = json.dumps({**chat_data["data"], "msgid": ind})
+        chat_data["msgid"] = ind
+        await self._send_message(to_send)
+        await _make_notify(self.user, self.receiver, chat_data)
+
+    def get_data_from(self, _dict, _from):
+        mark = None
+        tr = {"messages": {}, "updates": {}}
+        if not isinstance(_from, (str, int)):
+            print("Bad Type")
+            return {}
+        elif isinstance(_from, str):
+            if not _from.isnumeric():
+                print("not a number")
+                return {}
+            mark = int(_from) + 1
+        else:
+            mark = _from + 1
+        tr["updates"] = [
+            {"id": k, "s": v.get("rstamp")}
+            for k, v in _dict.items()
+            if v.get("read") and not v.get("seen_read") and v.get("sender") == self.user
+        ]
+        while 1:
+            data = _dict.get(mark)
+            if data:
+                tr["messages"][mark] = data
+                mark += 1
+            else:
+                break
+        return tr
+
+    def __repr__(self):
+        return "<Websocket Responder>"
+
+
 @app.websocket("/@/messenger/")
 @collect_websocket
 async def messenger():
-    socket_obj = None
-    ws = websocket
+    responder = WebsocketResponder(websocket._get_current_object())
     while 1:
-        data = None
-        __data = await ws.receive()
-        if __data == "ping":
-            # keep alive for heroku
-            await ws.send("pong")
-        else:
-            try:
-                data = json.loads(__data)
-            except:
-                await ws.send(json.dumps({"error": "Bad request"}))
-            if not session.get("user") or not session.get("logged_in"):
-                await ws.send(
-                    json.dumps(
-                        {"error": "Not Authenticated..did you clear your cookies?"}
-                    )
-                )
-            has_falsey, falsey_vals = has_false_types(
-                data, ("sender", "receiver", "chat_id", "message", "stamp")
-            )
-            if has_falsey:
-                await ws.send(
-                    json.dumps(
-                        {
-                            "error": f"No values provided for :{force_join(falsey_vals)} ."
-                        }
-                    )
-                )
-            sender = data["sender"]
-            receiver = data["receiver"]
-            chat_id = data["chat_id"]
-            message = data["message"]
-            tstamp = validate_stamp(data["stamp"])
-            fetch = data.get("fetch_messages")
-            fetch_from = data.get("fetch_from")
-            read = data.get("read")
-            media = data.get("media")
-            chat_data = None
-            if (
-                not sender == data["sender"]
-                or sender == data["receiver"]
-                or not session.get("user") == sender
-            ):
-                await ws.send(json.dumps({"error": f"Invalid sender value {sender}"}))
-            chat = verify_chat(session["user"], receiver, chat_id)
-            if not chat:
-                print(
-                    f"Creating A new Chat between '{session['user']}' and '{receiver}'"
-                )
-                chat = create_chat_data(session["user"], receiver)
-            else:
-                print(
-                    f"Using Existing Chat with id:{chat.id_};Participants:{session['user']}<=>{receiver}"
-                )
-            if message:
-                _chat_data = {
-                    "chat_id": chat_id,
-                    "data": {
-                        "message": message,
-                        "sender": sender,
-                        "receiver": receiver,
-                        "stamp": tstamp,
-                        "read": False,
-                        "media": False,
-                        "mediaURL": None,
-                        "rstamp": None,
-                    },
-                }
-                ind = alter_chat_data(_chat_data)
-                to_send = json.dumps({**_chat_data["data"], "msgid": ind})
-                _chat_data["msgid"] = ind
-                await ws.send(to_send)
-                await _make_notify(session["user"], receiver, _chat_data)
-            elif fetch:
-                if not fetch_from and not fetch_from == 0:
-                    await ws.send(
-                        json.dumps(
-                            {
-                                "data": check_chat_data(id_=chat_id).chats,
-                                "fetch": True,
-                                "full_fetch": True,
-                            }
-                        )
-                    )
-                else:
-                    _data = check_chat_data(id_=chat_id).chats
-                    tsend = get_data_from(_data, fetch_from)
-                    await ws.send(
-                        json.dumps(
-                            {
-                                "data": tsend,
-                                "full_fetch": False,
-                                "fetch": True,
-                                "fetched_from": fetch_from + 1,
-                            }
-                        )
-                    )
-            elif read and sender == session["user"]:
-                data = read
-                msgs = chat.chats
-                idx = data.get("id")
-                part_msg = msgs.get(idx)
-                if not part_msg:
-                    await ws.send(json.dumps({"error": "no_such_message"}))
-                part_msg["read"] = True
-                msgs[idx] = part_msg
-                chat_data = {
-                    "chat_id": chat_id,
-                    "msgid": idx,
-                    "update": {"read": True, "rstamp": tstamp},
-                }
-                alter_chat_data(chat_data, True)
-                await _make_notify(sender, receiver, chat_data, True)
-                await ws.send(json.dumps({"success": "ok"}))
-            elif media:
-                chat_data = {
-                    "chat_id": chat_id,
-                    "data": {
-                        "message": None,
-                        "sender": session["user"],
-                        "stamp": tstamp,
-                        "read": False,
-                        "media": True,
-                        "mediaURL": media,
-                        "rstamp": None,
-                        "receiver": receiver,
-                    },
-                }
-                ind = alter_chat_data(chat_data)
-                to_send = json.dumps({**chat_data["data"], "msgid": ind})
-                chat_data["msgid"] = ind
-                await _make_notify(session["user"], receiver, chat_data)
-                await ws.send(to_send)
-            else:
-                await ws.send(json.dumps({"error": "Bad request"}))
-    if socket_obj:
-        print("Removing user")
-        app.__sockets__.remove(socket_obj)
+        data = await websocket.receive()
+        await responder.parse_request(data)
+        creds = await responder.cred_check(session)
+        if not creds:
+            return
+        await responder.validate_message()
 
 
 @app.route("/api/users/", methods=["POST"])
@@ -560,29 +605,6 @@ async def _make_notify(sender, receiver, chat_, read=False):
             print(e)
     if not read:
         notify(receiver, final, userData)
-
-
-def get_data_from(_dict, _from):
-    mark = None
-    tr = {}
-    if not isinstance(_from, (str, int)):
-        print("Bad Type")
-        return {}
-    elif isinstance(_from, str):
-        if not _from.isnumeric():
-            print("not a number")
-            return {}
-        mark = int(_from) + 1
-    else:
-        mark = _from + 1
-    while 1:
-        data = _dict.get(mark)
-        if data:
-            tr[mark] = data
-            mark += 1
-        else:
-            break
-    return tr
 
 
 def validate_stamp(stamp: int) -> int:
@@ -749,15 +771,15 @@ def create_chat_data(u1: str, u2: str) -> bool:
     # pylint: enable=E1101
 
 
-def alter_chat_data(data, update=False):
+def alter_chat_data(data, new_message=False, read=False, rstats=False):
     # pylint: disable=E1101
-    if update and data.get("msgid") is None:
+    if (read or rstats) and data.get("msgid") is None:
         raise ValueError("Cannot Update without message ID")
     msgs = {}
-    if not update:
+    chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
+    msgs = chat_data.chats
+    if new_message:
         print("Altering data")
-        chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
-        msgs = chat_data.chats
         msg_index = len(msgs)
         msgs[msg_index] = data["data"]
         chat_data.chats = msgs
@@ -765,13 +787,22 @@ def alter_chat_data(data, update=False):
         db.session.merge(chat_data)
         db.session.commit()
         return msg_index
-    else:
-        chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
-        msgs = chat_data.chats
+    elif read:
         msgid = data["msgid"]
         edit_ = msgs[msgid]
         edit_["read"] = data["update"]["read"]
         edit_["rstamp"] = data["update"]["rstamp"]
+        edit_["seen_read"] = False
+        msgs[msgid] = edit_
+        chat_data.chats = msgs
+        flag_modified(chat_data, "chats")
+        db.session.merge(chat_data)
+        db.session.commit()
+        return True
+    elif rstats:
+        msgid = data["msgid"]
+        edit_ = msgs[msgid]
+        edit_["seen_read"] = True
         msgs[msgid] = edit_
         chat_data.chats = msgs
         flag_modified(chat_data, "chats")
@@ -786,4 +817,3 @@ open("/tmp/app-initialized", "w").close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", use_reloader=True)
-
