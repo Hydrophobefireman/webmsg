@@ -349,13 +349,13 @@
                     const __chats__ = await $get($.__chatID__);
                     for (const cc of updates) {
                         const b = cc.id;
-                        var msg_to_edit = document.querySelector(`div[data-msgid='${b}']`);
+                        const msg_to_edit = document.querySelector(`div[data-msgid='${b}']`);
                         __chats__[b].read = true;
                         __chats__[b].rstamp = cc.s;
                         $.set(msg_to_edit, "data-read", true);
                         $.set(msg_to_edit, "data-rstamp", cc.s);
                         await $set($.__chatID__, __chats__);
-                        __CurrSocketFetch({
+                        await __CurrSocketFetch({
                             sender: HERE,
                             receiver: THERE,
                             message: null,
@@ -363,7 +363,7 @@
                             seen_read: {
                                 id: b
                             },
-                            stamp: new Date().getTime()
+                            stamp: new Date().getTime();
                         })
                     }
                     const j = js.fetched_from;
@@ -541,7 +541,7 @@
                                     chat_id: chatid,
                                     stamp: new Date().getTime()
                                 };
-                                const txt = await __CurrSocketFetch(ws_data);
+                                await __CurrSocketFetch(ws_data);
                                 ////(txt);
                             }
                         }
@@ -564,7 +564,7 @@
                                 stamp
                             };
                             txtbox.value = '';
-                            const resp = await __CurrSocketFetch(data);
+                            await __CurrSocketFetch(data);
                             ////(resp)
                         }
                     }
@@ -1328,9 +1328,9 @@
                             chat_id
                         };
 
-                        fetchData(data); //no need of the data
                         actionInput.value = '';
                         box.remove()
+                        await fetchData(data); //no need of the data
                     }
                 }
             };
@@ -1394,6 +1394,10 @@
                     body,
                     chat_id,
                     mediaURL,
+                    messageOnClick() {
+                        window.location = `/#/chat/${chat_id}`;
+                        location.reload()
+                    },
                     hasAction,
                     actionText,
                     messageMode

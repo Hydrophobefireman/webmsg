@@ -30,12 +30,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm.attributes import flag_modified
 
 import envs
-from flask_tools import flaskUtils
 from notificationmanager import notify
 
 app = Quart(__name__)
 app.__sockets__ = set()
-flaskUtils(app)
 
 app.secret_key = os.environ.get("_secret-key")
 dburl = os.environ.get("DATABASE_URL")
@@ -813,6 +811,7 @@ def alter_chat_data(data, new_message=False, read=False, rstats=False):
 
 
 # for heroku nginx
+time.sleep(2)
 open("/tmp/app-initialized", "w").close()
 
 if __name__ == "__main__":
