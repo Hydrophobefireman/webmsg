@@ -256,6 +256,11 @@ async def login():
     return resp, code
 
 
+@app.route("/favicon.ico")
+async def faviconss():
+    return send_from_directory("static", "favicon.ico")
+
+
 @app.route("/register/check/", methods=["GET", "POST"])
 async def register():
     if request.method == "GET":
@@ -420,11 +425,14 @@ class WebsocketResponder:
             return await self._text_reply(text=False, _media=True)
         if self.fetch:
             full_fetch = not self.fetch_from and not self.fetch_from == 0
-            return await self._send_message(await self._parse_fetches(full_fetch))
+            resp = await self._parse_fetches(full_fetch)
+            return await self._send_message(resp)
         if self.read and not self.sender == self.user:
-            return await self._send_message(await self._read_response())
+            resp = await self._read_response()
+            return await self._send_message(resp)
         if self.seen_read and self.sender == self.user:
-            return await self._send_message(await self._update_read_stat())
+            resp = await self._update_read_stat()
+            return await self._send_message(resp)
         return await self._send_message({"error": "Bad request"})
 
     async def _update_read_stat(self):
