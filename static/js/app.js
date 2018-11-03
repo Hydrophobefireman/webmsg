@@ -346,24 +346,10 @@
                         const new_data = Object.assign({}, __, data);
                         await $set($.__chatID__, new_data);
                     };
-                    const j = js.fetched_from;
-                    for (let i = 0; i < Object.keys(data).length; i++) {
-                        let d;
-                        if (!isNaN(j)) {
-                            d = i + j;
-                        } else {
-                            d = i
-                        }
-                        const __msg__ = data[d];
-                        if (__msg__) {
-                            __msg__.msgid = d;
-                            await parse_message(parent_element, __msg__);
-                        }
-                    };
                     const __chats__ = await $get($.__chatID__);
                     for (const cc of updates) {
                         const b = cc.id;
-                        var msg_to_edit = document.querySelector(`div[data-msgid='${msid}']`);
+                        var msg_to_edit = document.querySelector(`div[data-msgid='${b}']`);
                         __chats__[b].read = true;
                         __chats__[b].rstamp = cc.s;
                         $.set(msg_to_edit, "data-read", true);
@@ -380,6 +366,21 @@
                             stamp: new Date().getTime()
                         })
                     }
+                    const j = js.fetched_from;
+                    for (let i = 0; i < Object.keys(data).length; i++) {
+                        let d;
+                        if (!isNaN(j)) {
+                            d = i + j;
+                        } else {
+                            d = i
+                        }
+                        const __msg__ = data[d];
+                        if (__msg__) {
+                            __msg__.msgid = d;
+                            await parse_message(parent_element, __msg__);
+                        }
+                    };
+
                     return;
                 }
                 let text, sender, receiver, stamp, read, rstamp, msgid;
