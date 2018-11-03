@@ -363,7 +363,7 @@
                             seen_read: {
                                 id: b
                             },
-                            stamp: new Date().getTime();
+                            stamp: new Date().getTime(),
                         })
                     }
                     const j = js.fetched_from;
