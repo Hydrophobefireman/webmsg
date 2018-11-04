@@ -258,7 +258,7 @@ async def login():
 
 @app.route("/favicon.ico")
 async def faviconss():
-    return send_from_directory("static", "favicon.ico")
+    return await send_from_directory("static", "favicon.ico")
 
 
 @app.route("/register/check/", methods=["GET", "POST"])
