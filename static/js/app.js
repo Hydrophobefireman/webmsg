@@ -235,7 +235,7 @@
                 $.set(a, 'data-user', i.user)
                 $.set(a, "data-chat_id", i.chat_id)
                 btn.onclick = () => {
-                    window.location.href = `/#/chat/${i.chat_id}`;
+                    window.location.hash = `/#/chat/${i.chat_id}`;
                     window.location.reload();
                 }
                 //refresh chat context
