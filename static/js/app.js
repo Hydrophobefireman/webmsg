@@ -650,8 +650,7 @@
                         day: 'numeric'
                     }).format(new Date(stamp));
                 } catch (e) {
-                    console.warn(e);
-                    return "Invalid Date"
+                    return new Date(stamp).toLocaleString()
                 }
             }
 
