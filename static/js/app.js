@@ -638,6 +638,23 @@
         }
 
         function make_msg_info(_self) {
+            function stampFormat(stamp) {
+                try {
+                    return Intl.DateTimeFormat("auto", {
+                        hour: 'numeric',
+                        hour12: !0,
+                        minute: 'numeric',
+                        second: 'numeric',
+                        year: 'numeric',
+                        month: 'numeric',
+                        day: 'numeric'
+                    }).format(new Date(stamp));
+                } catch (e) {
+                    console.warn(e);
+                    return "Invalid Date"
+                }
+            }
+
             const dataset = _self.dataset,
                 sender = dataset.sender,
                 stamp = parseInt(dataset.stamp),
@@ -703,17 +720,9 @@
             sender_key.textContent = 'Sender';
             sender_val.textContent = sender + (sender === HERE ? "(You)" : "");
             stamp_key.textContent = 'Time';
-            stamp_val.textContent = Intl.DateTimeFormat("auto", {
-                hour: 'numeric',
-                hour12: !0,
-                minute: 'numeric',
-                second: 'numeric',
-                year: 'numeric',
-                month: 'numeric',
-                day: 'numeric'
-            }).format(new Date(stamp));
+            stamp_val.textContent = stampFormat(stamp)
             read_key.textContent = 'Read-Status';
-            read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? new Date(rstamp).toLocaleString() : "N/A"})` : "Sent";
+            read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? stampFormat(rstamp) : "N/A"})` : "Sent";
             if (sender !== HERE) {
                 read_key.style.display = 'none';
                 read_val.style.display = 'none'
