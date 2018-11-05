@@ -703,7 +703,12 @@
             sender_key.textContent = 'Sender';
             sender_val.textContent = sender + (sender === HERE ? "(You)" : "");
             stamp_key.textContent = 'Time';
-            stamp_val.textContent = new Date(stamp).toLocaleString();
+            stamp_val.textContent = Intl.DateTimeFormat("auto", {
+                hour: 'numeric',
+                hour12: !0,
+                minute: 'numeric',
+                second: 'numeric',
+            }).format(new Date(stamp)).toUpperCase();
             read_key.textContent = 'Read-Status';
             read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? new Date(rstamp).toLocaleString() : "N/A"})` : "Sent";
             if (sender !== HERE) {
