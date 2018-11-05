@@ -367,12 +367,14 @@ class WebsocketResponder:
 
     async def parse_request(self, data: str) -> None:
         if data == "ping":
-            return await self._send_message("pong")
+            await self._send_message("pong")
+            return False
         try:
             self._req = json.loads(data)
-            return self._req
+            return True
         except:
-            return await self._send_message({"error": "Bad request"})
+            await self._send_message({"error": "Bad request"})
+            return False
 
     async def cred_check(self, _session) -> None:
         if not session.get("user") or not session.get("logged_in"):
@@ -546,11 +548,12 @@ async def messenger():
     responder = WebsocketResponder(websocket._get_current_object())
     while 1:
         data = await websocket.receive()
-        await responder.parse_request(data)
-        creds = await responder.cred_check(session)
-        if not creds:
-            return
-        await responder.validate_message()
+        req = await responder.parse_request(data)
+        if req:
+            creds = await responder.cred_check(session)
+            if not creds:
+                return
+            await responder.validate_message()
 
 
 @app.route("/api/users/", methods=["POST"])
