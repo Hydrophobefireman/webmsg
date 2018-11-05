@@ -26,6 +26,7 @@ from quart import (
     session,
     websocket,
 )
+
 from sqlalchemy import or_
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -391,7 +392,7 @@ class WebsocketResponder:
                 {"error": f"No values provided for :{force_join(falsey_vals)} ."}
             )
             return False
-        await self._parse_message()
+        return await self._parse_message()
 
     async def _parse_message(self):
         data = self._req
@@ -416,7 +417,8 @@ class WebsocketResponder:
         if not chat:
             return await self._send_message({"error": "Invalid Chat"})
         self.__chat__ = chat
-        await self._conditional_responses()
+
+        return await self._conditional_responses()
 
     async def _conditional_responses(self):
         if self.message:
@@ -501,6 +503,7 @@ class WebsocketResponder:
             chat_data["data"]["media"] = True
             chat_data["data"]["mediaURL"] = self.media
         ind = alter_chat_data(chat_data, new_message=True)
+        print("Altering chat..message:", self.message)
         to_send = json.dumps({**chat_data["data"], "msgid": ind})
         chat_data["msgid"] = ind
         await self._send_message(to_send)

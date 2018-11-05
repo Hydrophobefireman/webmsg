@@ -495,6 +495,7 @@
                 results_all.appendChild(boxwrap);
                 close_btn.onclick = () => {
                     if (typeof ws === "object") {
+                        ws.onclose = () => {}
                         ws.close()
                     }
                     app.route(`/u/${HERE}`);
