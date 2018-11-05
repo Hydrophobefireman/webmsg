@@ -708,7 +708,10 @@
                 hour12: !0,
                 minute: 'numeric',
                 second: 'numeric',
-            }).format(new Date(stamp)).toUpperCase();
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric'
+            }).format(new Date(stamp));
             read_key.textContent = 'Read-Status';
             read_val.textContent = read === "true" ? `Read (${!isNaN(rstamp) ? new Date(rstamp).toLocaleString() : "N/A"})` : "Sent";
             if (sender !== HERE) {
