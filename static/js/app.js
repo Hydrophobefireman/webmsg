@@ -235,10 +235,7 @@
                 $.set(a, 'data-user', i.user)
                 $.set(a, "data-chat_id", i.chat_id)
                 btn.onclick = () => {
-                    const _ = $.create("a", {
-                        href: `/#/chat/${i.chat_id}`
-                    });
-                    _.click();
+                    location.href = `/#/chat/${i.chat_id}`
                     location.reload();
                 }
                 //refresh chat context
