@@ -235,8 +235,7 @@
                 $.set(a, 'data-user', i.user)
                 $.set(a, "data-chat_id", i.chat_id)
                 btn.onclick = () => {
-                    location.href = `/#/chat/${i.chat_id}`
-                    location.reload();
+                    location.href = `${window.location.protocol}//${location.host}/#/chat/${i.chat_id}`;
                 }
                 //refresh chat context
                 btn.className = 'resbtn'
@@ -1416,8 +1415,7 @@
                     chat_id,
                     mediaURL,
                     messageOnClick() {
-                        window.location = `/#/chat/${chat_id}`;
-                        location.reload()
+                        window.location = location.href = `${window.location.protocol}//${location.host}/#/chat/${chat_id}`;
                     },
                     hasAction,
                     actionText,
