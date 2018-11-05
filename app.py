@@ -822,9 +822,8 @@ def alter_chat_data(data, new_message=False, read=False, rstats=False):
 
 
 # for heroku nginx
-@app.before_serving
-def open_to_nginx():
-    open("/tmp/app-initialized", "w").close()
+
+open("/tmp/app-initialized", "w").close()
 
 
 if __name__ == "__main__":
