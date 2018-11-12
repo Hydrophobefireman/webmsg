@@ -162,7 +162,7 @@ body {
 
 .chat_body {
     height: 85%;
-	background-color:#111;
+
     overflow-y: scroll;
     overflow-wrap: break-word;
     overflow-x: hidden
