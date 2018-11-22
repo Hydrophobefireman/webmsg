@@ -55,7 +55,7 @@ http {
 	
 	# pagespeed filters
 		pagespeed CriticalImagesBeaconEnabled false; #beacons get blocked by ublock...i dont want that
-		pagespeed EnableFilters outline_javascript
+		pagespeed EnableFilters outline_javascript;
 		pagespeed EnableFilters rewrite_css,rewrite_javascript;
 		pagespeed EnableFilters move_css_above_scripts,combine_javascript,combine_css,inline_css,inline_google_font_css,inline_javascript;
 		pagespeed EnableFilters collapse_whitespace,extend_cache,remove_quotes,convert_meta_tags,insert_dns_prefetch;
