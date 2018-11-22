@@ -26,15 +26,14 @@ from quart import (
     session,
     websocket,
 )
-
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm.attributes import flag_modified
 
 import envs
 from notificationmanager import notify
 
 app = Quart(__name__)
-app.__sockets__ = set()
+app.__sockets__ = {}
 
 app.secret_key = os.environ.get("_secret-key")
 dburl = os.environ.get("DATABASE_URL")
@@ -50,13 +49,6 @@ def open_and_read(fn: str, mode: str = "r", strip: bool = True):
             data = f.read()
     return data
 
-
-if dburl is None:
-    dburl = open_and_read(".dbinfo_")
-if dburl is None:
-    raise Exception(
-        "No DB url specified try add it to the environment or create a .dbinfo_ file with the url"
-    )
 
 app.config["SQLALCHEMY_DATABASE_URI"] = dburl
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -126,7 +118,9 @@ async def make_notif():
     if not session.get("logged_in") or not session.get("user") or not form.get("token"):
         return "NO"
     token = form.get("token")
-    user = userData.query.filter_by(user=session["user"]).first()
+    user = userData.query.filter(
+        func.lower(userData.user) == func.lower(session["user"])
+    ).first()
     if not user:
         return "ERROR:USER NOT IN DB", 500
     user.notification_id = token
@@ -235,7 +229,7 @@ async def login():
             json.dumps({"error": "fields_empty_or_session_error"})
         )
         code = 403
-    udata = userData.query.filter_by(user=user).first()
+    udata = userData.query.filter(func.lower(userData.user) == func.lower(user)).first()
     if udata is None:
         resp = await make_response(json.dumps({"error": "no_such_user"}))
         code = 403
@@ -291,7 +285,7 @@ async def register():
             status=403,
         )
     u_data = User(user, password)
-    if userData.query.filter_by(user=user).first():
+    if userData.query.filter(func.lower(userData.user) == func.lower(user)).first():
         return Response(
             json.dumps({"error": "username_taken"}),
             content_type="application/json",
@@ -325,235 +319,156 @@ async def get_search_token(nonce):
     return token
 
 
-def collect_websocket(func):
+def collect_websocket(funct):
     # https://medium.com/@pgjones/websockets-in-quart-f2067788d1ee
-    @wraps(func)
+    @wraps(funct)
     async def wrapper(*args, **kwargs):
         _obj = websocket._get_current_object()
-        setattr(_obj, "__user__", session.get("user"))
-        tr = []
-        for i in app.__sockets__:
-            if i.__user__ == session["user"]:
-                print("Multiple Socket Connections..removing previous one")
-                tr.append(i)
-        [app.__sockets__.remove(i) for i in tr]
-        app.__sockets__.add(_obj)
+        setattr(_obj, "_session", session)
+        if not session.get("user"):
+            return
+        app.__sockets__[session["user"]] = _obj
         try:
-            return await func(*args, **kwargs)
+            return await funct(*args, **kwargs)
         except Exception as e:
+            print(f"Removing {session['user']}")
             try:
-                app.__sockets__.remove(_obj)
+                app.__sockets__.pop(session["user"])
             except:
                 print("Couldn't remove:", _obj)
-            print(f"Removing {_obj.__user__}")
             raise e
 
     return wrapper
+
+
+@app.route("/api/get-userstats/", methods=["POST"])
+async def getstats():
+    ct = "application/json"
+    form = await request.form
+    user = form.get("user")
+    if not user:
+        return Response(json.dumps({"error": "No User Specified"}), content_type=ct)
+    socket = app.__sockets__.get(user)
+    stat = "online" if socket else "offline"
+    return Response(json.dumps({"status": stat}), content_type=ct)
 
 
 class WebsocketResponder:
     def __init__(self, ws_obj: websocket) -> None:
         self.socket = ws_obj
         self._req = {}
+        self.offerer = None
         self.user = None
 
-    async def _send_message(self, message: [dict, str]) -> None:
-        if isinstance(message, str):
-            return await self.socket.send(message)
-        elif isinstance(message, dict):
-            return await self.socket.send(json.dumps(message))
-        else:
-            raise TypeError("Only dict and str tpes are supported")
+    async def read_message(self) -> str:
+        msg = await self.socket.receive()
+        self.current_message = msg
+        return self.current_message
 
-    async def parse_request(self, data: str) -> None:
+    async def __send_message(self, message: [dict, str], __socket) -> None:
+        if isinstance(message, str):
+            return await __socket.send(message)
+        elif isinstance(message, dict):
+            return await __socket.send(json.dumps(message))
+        else:
+            raise TypeError("Only dict and str types are supported")
+
+    async def send_message(self, message, rsocket=None):
+        socket_object = rsocket or self.socket
+        return await self.__send_message(message, socket_object)
+
+    async def parse_request(self) -> bool:
+        data = self.current_message
         if data == "ping":
-            await self._send_message("pong")
+            await self.send_message("pong")
             return False
         try:
             self._req = json.loads(data)
             return True
         except:
-            await self._send_message({"error": "Bad request"})
+            await self.send_message({"error": "Bad request"})
             return False
 
-    async def cred_check(self, _session) -> None:
-        if not session.get("user") or not session.get("logged_in"):
-            await self._send_message(
+    async def check_validity(self):
+        if self._req.get("nproxy"):
+            return True
+        if not self._req.get("sendTo"):
+            await self.send_message({"error": "Invalid Values"})
+            return False
+        if self._req.get("nproxy"):
+            print("Proxied Message..Ignore")
+            return False
+        return True
+
+    async def offerer_respond(self) -> dict:
+        if self.send_to:
+            if not isinstance(self.offerer, bool):
+                await self.send_message(
+                    {"nproxy": True, "checkOfferer": True, "sendTo": session["user"]},
+                    self.send_to,
+                )
+            self.offerer = True if not self._req.get("isOfferer") else False
+            await self.send_message(
+                {
+                    "nproxy": True,
+                    "set_role": not self.offerer,
+                    "sendTo": session["user"],
+                },
+                self.send_to,
+            )
+            print("Sent Role Data")
+            await self.send_message({"set_role": self.offerer})
+        else:
+            # no one is online on the other side..set offerer by default
+            self.offerer = True
+            await self.send_message({"set_role": self.offerer})
+
+    async def create_response(self) -> None:
+        msg = self._req
+        is_valid = await self.check_validity()
+        if not is_valid:
+            return
+        _send_to = msg.get("sendTo")
+        self.send_to = app.__sockets__.get(_send_to)
+        if not self.send_to:
+            return await self.send_message(
+                {"error": "offline", "offline": True, "sendTo": _send_to}
+            )
+        self.rtc_data = msg.get("rtcData")
+        self.offerer = msg.get("isOfferer")
+        if self.offerer is not None:
+            return await self.offerer_respond()
+
+        if self.rtc_data:
+            await self.send_message(
+                {"rtcData": self.rtc_data, "sendTo": session["user"]}, self.send_to
+            )
+
+    async def cred_check(self, _session: dict) -> bool:
+        if not _session.get("user") or not _session.get("logged_in"):
+            await self.send_message(
                 {"error": "Not Authenticated..did you clear your cookies?"}
             )
             return False
-        self.user = session["user"]
+        self.user = _session["user"]
         return True
-
-    async def validate_message(self):
-        has_falsey, falsey_vals = has_false_types(
-            self._req, ("sender", "receiver", "chat_id", "message", "stamp")
-        )
-        if has_falsey:
-            await self._send_message(
-                {"error": f"No values provided for :{force_join(falsey_vals)} ."}
-            )
-            return False
-        return await self._parse_message()
-
-    async def _parse_message(self):
-        data = self._req
-        self.sender = data["sender"]
-        self.receiver = data["receiver"]
-        self.chat_id = data["chat_id"]
-        self.message = data["message"]
-        self.tstamp = validate_stamp(data["stamp"])
-        self.fetch = data.get("fetch_messages")
-        self.fetch_from = data.get("fetch_from")
-        self.read = data.get("read")
-        self.seen_read = data.get("seen_read")
-        self.media = data.get("media")
-        self.chat_data = None
-        if (not self.user == self.sender and not self.user == self.receiver) or (
-            self.sender == self.receiver
-        ):
-            return await self._send_message(
-                {"error": f"Invalid sender value {self.sender}"}
-            )
-        chat = verify_chat(self.sender, self.receiver, self.chat_id)
-        if not chat:
-            return await self._send_message({"error": "Invalid Chat"})
-        self.__chat__ = chat
-
-        return await self._conditional_responses()
-
-    async def _conditional_responses(self):
-        if self.message:
-            return await self._text_reply(text=True)
-        if self.media:
-            return await self._text_reply(text=False, _media=True)
-        if self.fetch:
-            full_fetch = not self.fetch_from and not self.fetch_from == 0
-            resp = await self._parse_fetches(full_fetch)
-            return await self._send_message(resp)
-        if self.read and not self.sender == self.user:
-            resp = await self._read_response()
-            return await self._send_message(resp)
-        if self.seen_read and self.sender == self.user:
-            resp = await self._update_read_stat()
-            return await self._send_message(resp)
-        return await self._send_message({"error": "Bad request"})
-
-    async def _update_read_stat(self):
-        data = self.seen_read
-        if self.receiver == self.user:
-            return {"error": "invalid receiver..for seen_stats"}
-        idx = data.get("id")
-        chat_data = {
-            "chat_id": self.chat_id,
-            "msgid": idx,
-            "update": {"seen_read": True},
-        }
-        alter_chat_data(chat_data, rstats=True)
-        return {"success": "ok"}
-
-    async def _read_response(self):
-        if self.sender == self.user:
-            return {"error": "invalid sender..for read receipt"}
-        data = self.read
-        msgs = self.__chat__.chats
-        idx = data.get("id")
-        part_msg = msgs.get(idx)
-        if not part_msg:
-            return {"error": "No Such Message."}
-        part_msg["read"] = True
-        msgs[idx] = part_msg
-        chat_data = {
-            "chat_id": self.chat_id,
-            "msgid": idx,
-            "update": {"read": True, "rstamp": self.tstamp},
-        }
-        alter_chat_data(chat_data, read=True)
-        await _make_notify(self.sender, self.receiver, chat_data, True)
-        return {"success": "ok"}
-
-    async def _parse_fetches(self, full):
-        _data = {"fetch": True}
-        chat_data = check_chat_data(id_=self.chat_id).chats
-        if full:
-            _data["data"] = chat_data
-            _data["full_fetch"] = True
-        else:
-            tsend = self.get_data_from(chat_data, self.fetch_from)
-            _data["data"] = tsend
-            _data["full_fetch"] = False
-            _data["fetched_from"] = self.fetch_from + 1
-        return _data
-
-    async def _text_reply(self, text=True, _media=None):
-        chat_data = {
-            "chat_id": self.chat_id,
-            "data": {
-                "message": None,
-                "media": False,
-                "mediaURL": None,
-                "sender": self.sender,
-                "receiver": self.receiver,
-                "stamp": self.tstamp,
-                "read": False,
-                "rstamp": None,
-            },
-        }
-        if text:
-            chat_data["data"]["message"] = self.message
-        elif _media:
-            chat_data["data"]["media"] = True
-            chat_data["data"]["mediaURL"] = self.media
-        ind = alter_chat_data(chat_data, new_message=True)
-        print("Altering chat..message:", self.message)
-        to_send = json.dumps({**chat_data["data"], "msgid": ind})
-        chat_data["msgid"] = ind
-        await self._send_message(to_send)
-        await _make_notify(self.user, self.receiver, chat_data)
-
-    def get_data_from(self, _dict, _from):
-        mark = None
-        tr = {"messages": {}, "updates": {}}
-        if not isinstance(_from, (str, int)):
-            print("Bad Type")
-            return {}
-        elif isinstance(_from, str):
-            if not _from.isnumeric():
-                print("not a number")
-                return {}
-            mark = int(_from) + 1
-        else:
-            mark = _from + 1
-        tr["updates"] = [
-            {"id": k, "s": v.get("rstamp")}
-            for k, v in _dict.items()
-            if v.get("read") and not v.get("seen_read") and v.get("sender") == self.user
-        ]
-        while 1:
-            data = _dict.get(mark)
-            if data:
-                tr["messages"][mark] = data
-                mark += 1
-            else:
-                break
-        return tr
 
     def __repr__(self):
         return "<Websocket Responder>"
 
 
-@app.websocket("/@/messenger/")
+@app.websocket("/_/data/")
 @collect_websocket
 async def messenger():
-    responder = WebsocketResponder(websocket._get_current_object())
+    ws = WebsocketResponder(websocket)
     while 1:
-        data = await websocket.receive()
-        req = await responder.parse_request(data)
+        await ws.read_message()
+        cred = await ws.cred_check(session)
+        if not cred:
+            return
+        req = await ws.parse_request()
         if req:
-            creds = await responder.cred_check(session)
-            if not creds:
-                return
-            await responder.validate_message()
+            await ws.create_response()
 
 
 @app.route("/api/users/", methods=["POST"])
@@ -594,29 +509,9 @@ def check_or_create_chat(user1, user2):
     return a
 
 
-async def _make_notify(sender, receiver, chat_, read=False):
-    final = {}
-    data = None
-    if not read:
-        data = chat_.get("data")
-        final["hasImage"] = data.get("mediaURL")
-        final["chat_id"] = chat_["chat_id"]
-        final["sender"] = data.get("sender")
-        final["receiver"] = data.get("receiver")
-        final["message"] = data.get("message")
-    _req_socket = [s for s in app.__sockets__ if s.__user__ == receiver]
-    if _req_socket:
-        try:
-            if read:
-                return await _req_socket[0].send(json.dumps(chat_))
-            else:
-                await _req_socket[0].send(
-                    json.dumps({**data, "msgid": chat_.get("msgid")})
-                )
-        except Exception as e:  # user disconnected?
-            print(e)
-    if not read:
-        notify(receiver, final, userData)
+async def _make_notify(sender, receiver, d):
+
+    notify(receiver, d, userData)
 
 
 def validate_stamp(stamp: int) -> int:
@@ -666,7 +561,7 @@ def parse_local_assets(html):
             src = src[1:]
         _file = os.path.join(app.root_path, src)
         checksum = checksum_f(_file)
-        name = checksum + ext
+        name = src.split("/")[-1].split(".")[0] + "." + checksum + ext
         location = os.path.join("static", "dist", name)
         if os.path.isfile(os.path.join(app.root_path, location)):
             print("No change in file..skipping")
@@ -676,7 +571,7 @@ def parse_local_assets(html):
     return str(soup)
 
 
-def checksum_f(filename, meth="sha256"):
+def checksum_f(filename, meth="md5"):
     foo = getattr(hashlib, meth)()
     _bytes = 0
     total = os.path.getsize(filename)
@@ -829,7 +724,11 @@ def alter_chat_data(data, new_message=False, read=False, rstats=False):
 def open_to_nginx():
     try:
         open("/tmp/app-initialized", "w").close()
-    except:pass
+    except:
+        pass
+
+
+# WebRTC signalling thorugh-->WebSockets..set up a signalling mechanism
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", use_reloader=True)

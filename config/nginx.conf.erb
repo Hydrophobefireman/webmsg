@@ -49,13 +49,15 @@ http {
 		pagespeed FetchHttps enable;
 		pagespeed RespectXForwardedProto on;
 	# pagespeed javascript experiment
-		pagespeed 	UseExperimentalJsMinifier on;
+		pagespeed 	UseExperimentalJs
+		
+		fier on;
 	
 	# pagespeed default filters
 		pagespeed	RewriteLevel CoreFilters;
 	
 	# pagespeed filters
-		pagespeed CriticalImagesBeaconEnabled false;#beacons get blocked by ublock...i dont want that
+		pagespeed CriticalImagesBeaconEnabled false; #beacons get blocked by ublock...i dont want that
 		pagespeed EnableFilters responsive_images;
 		pagespeed EnableFilters outline_javascript,lazyload_images;
 		pagespeed EnableFilters rewrite_css,rewrite_javascript;
@@ -72,7 +74,7 @@ http {
 			proxy_redirect off;
 			proxy_pass http://app_server;
 		}	
-		location /@/messenger {
+		location /_/data/ {
 			proxy_pass http://app_server;
 			proxy_http_version 1.1;
 			proxy_set_header Upgrade $http_upgrade;
@@ -83,10 +85,9 @@ http {
 			try_files $uri =404;
 		}	
 		location /get-cached/x/ {
-			autoindex on;
 			sendfile on;
 			alias /app/saves/;
-			try_files $arg_f =403;
+			try_files $arg_f = 403;
 		}
 	}
 }

@@ -7,14 +7,12 @@
     <title>WebMsg</title>
     <link rel="manifest" href="/static/manifest.json">
     <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <meta name="integrity" content="{{nonce}}" />
     <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
-    <link rel="stylesheet" href="static/cssmin/main.css">
-    <script src="/static/jsmin/idb.js"></script>
+    <link rel="stylesheet" href="/static/cssmin/main.css">
     <script src="https://www.gstatic.com/firebasejs/5.5.5/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/5.5.5/firebase-messaging.js"></script>
-    <script src="/static/jsmin/firebaseRegister.js"></script>
-    <meta name="integrity" content="{{nonce}}" />
-    <script src="/static/jsmin/app.js" async defer></script>
+    <script src="/static/jsmin/app.js" async type="module"></script>
 </head>
 
 <body>

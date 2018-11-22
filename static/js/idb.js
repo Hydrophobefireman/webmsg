@@ -1,6 +1,6 @@
-((() => {
-    if (!window.indexedDB) {
-        const noop = async () => undefined;
+export const idbinit = () => {
+    if (!window.indexedDB) { /*catch errors in private browsing like firefox*/
+        const noop = async () => null;
         window.$get = window.$set = window.$keys = window.$__clear__ = window.$del = noop
     } else {
         class WebStore {
@@ -25,7 +25,7 @@
                     transaction.oncomplete = () => resolve();
                     transaction.onabort = transaction.onerror = () => reject();
                     cb(transaction.objectStore(this.storeName));
-                })).catch(e => null);
+                })).catch(e => console.log(e) || null);
             }
         }
         let store;
@@ -36,7 +36,7 @@
             let req;
             return store.__IDBAct__("readonly", dat => {
                 req = dat.get(key)
-            }).then(() => req.result).catch(e => null)
+            }).then(() => req.result).catch(e => console.log(e) || null)
         }
 
         window.$set = (key, val, store = __defaultStore__()) => {
@@ -85,4 +85,4 @@
             }).then(() => keys).catch(e => null);
         }
     }
-}))()
+};
