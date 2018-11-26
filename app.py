@@ -369,6 +369,7 @@ async def getstats():
     if not user:
         return Response(json.dumps({"error": "No User Specified"}), content_type=ct)
     socket = app.__sockets__.get(user)
+    print(app.__sockets__)
     stat = "online" if socket else "offline"
     return Response(json.dumps({"status": stat}), content_type=ct)
 
