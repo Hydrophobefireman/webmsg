@@ -33,7 +33,7 @@ import envs
 from notificationmanager import notify
 
 app = Quart(__name__)
-app.__sockets__ = {}
+app.__sockets__ = set()
 
 app.secret_key = os.environ.get("_secret-key")
 dburl = os.environ.get("DATABASE_URL")
@@ -339,26 +339,34 @@ async def get_search_token(nonce):
     return token
 
 
-def collect_websocket(funct):
+def collect_websocket(func):
     # https://medium.com/@pgjones/websockets-in-quart-f2067788d1ee
-    @wraps(funct)
+    @wraps(func)
     async def wrapper(*args, **kwargs):
         _obj = websocket._get_current_object()
-        setattr(_obj, "_session", session)
-        if not session.get("user"):
-            return
-        app.__sockets__[session["user"]] = _obj
+        setattr(_obj, "idxs", session["user"])
+        tr = []
+        for i in app.__sockets__:
+            if i.idxs == session["user"]:
+                print("Multiple Socket Connections..removing previous one")
+                tr.append(i)
+        [app.__sockets__.remove(i) for i in tr]
+        app.__sockets__.add(_obj)
         try:
-            return await funct(*args, **kwargs)
+            return await func(*args, **kwargs)
         except Exception as e:
-            print(f"Removing {session['user']}")
-            try:
-                app.__sockets__.pop(session["user"])
-            except:
-                print("Couldn't remove:", _obj)
+            app.__sockets__.remove(_obj)
+            print(f"Removing {_obj.idxs}")
             raise e
 
     return wrapper
+
+
+def sockets_get(u):
+    a = [i for i in app.__sockets__ if i.idxs == u]
+    if a:
+        return a[0]
+    return None
 
 
 @app.route("/api/get-userstats/", methods=["POST"])
@@ -368,7 +376,7 @@ async def getstats():
     user = form.get("user")
     if not user:
         return Response(json.dumps({"error": "No User Specified"}), content_type=ct)
-    socket = app.__sockets__.get(user)
+    socket = sockets_get(user)
     print(app.__sockets__)
     stat = "online" if socket else "offline"
     return Response(json.dumps({"status": stat}), content_type=ct)
@@ -450,7 +458,7 @@ class WebsocketResponder:
         if not is_valid:
             return
         _send_to = msg.get("sendTo")
-        self.send_to = app.__sockets__.get(_send_to)
+        self.send_to = sockets_get(_send_to)
         if not self.send_to and not msg.get("RB"):
             return await self.send_message(
                 {"error": "offline", "offline": True, "sendTo": _send_to}
@@ -479,7 +487,7 @@ class WebsocketResponder:
                     self.send_to,
                 )
             else:
-                _s = app.__sockets__.get(rb)
+                _s = sockets_get(rb)
                 if _s:
                     await self.send_message(
                         {"get_status": True, "isOn": False, "sendTo": session["user"]},
