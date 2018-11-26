@@ -4,6 +4,7 @@ import {
     urlencode,
     makeCSS,
     makeComponent as H,
+    getUser,
 } from "../commons.js";
 const _responses = {
     login: {
@@ -67,7 +68,20 @@ function enableLoginBox(a) {
     $.id("rfbox").style.display = "none"
 }
 const startLoginComponent = H("button", {
-    id: "login"
+    id: "login",
+    style: {
+        "background-color": "#fff",
+        "border-radius": "5px",
+        "padding": "4px",
+        "border": "1px solid #6200ee",
+        "outline": "0",
+        "color": "#6200ee",
+        "text-transform": "uppercase",
+        "width": "80px",
+        "height": "30px",
+        "margin": "10px",
+        "cursor": "pointer"
+    }
 }, {
     click: enableLoginBox
 }, "Login");
@@ -83,7 +97,20 @@ function enableSignupBox(a) {
         $.id("lfbox").style.display = "none"
 }
 const startSignupComponent = H("button", {
-    id: "signup"
+    id: "signup",
+    style: {
+        "color": "#6200ee",
+        "border-radius": "5px",
+        "padding": "4px",
+        "border": "1px solid #6200ee",
+        "outline": "0",
+        "background-color": "#fff",
+        "text-transform": "uppercase",
+        "width": "80px",
+        "height": "30px",
+        "margin": "10px",
+        "cursor": "pointer"
+    }
 }, {
     click: enableSignupBox
 }, "Signup");
@@ -93,7 +120,12 @@ const registerFormComponent = H("div", {
     id: "register-form"
 }, null, null, null, null, [
     H("div", {
-        id: "__errs__"
+        id: "__errs__",
+        style: {
+            "color": "red",
+            "visibility": "hidden",
+            "height": "20px"
+        }
     }), H("input", {
         class: "input_x",
         id: "username-reg",
@@ -280,12 +312,11 @@ export const loginComponent = H(
     },
     null, null,
     async () => {
-        const a = await fetch('/api/getuser', {
-            credentials: 'include'
-        });
-        if (!a.ok) return null;
-        const b = await a.text();
-        console.log('[Routing]->/u/' + b), location.hash = '/u/' + b, document.title = b + ' - WebMsg'
+        const b = await getUser();
+        if (!b) {
+            return null
+        }
+        console.log(`[Routing]->/u/${b}`), location.hash = `/u/${b}`, document.title = `${b} - WebMsg`
     }, async () => {
             console.log("Rendered login page"), document.title = "Login - WebMsg"
         },

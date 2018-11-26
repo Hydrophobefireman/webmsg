@@ -2,6 +2,16 @@
     box-shadow: 2px 2px
 }
 
+.loading-gif {
+    height: 20px;
+    display: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none
+}
+
 #login {
     background-color: #fff;
     border-radius: 5px;
@@ -25,7 +35,7 @@
 #__errs__ {
     color: red;
     visibility: hidden;
-    height: 20px;
+    height: 20px
 }
 
 #signup {
@@ -53,7 +63,7 @@
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
-    -ms-user-select: none;
+    -ms-user-select: none
 }
 
 .submit-button {
@@ -78,15 +88,18 @@
 
 .resbtn {
     background-color: #fff;
-    border-radius: 20px;
+    border-radius: 5px;
     padding: 4px;
     border: 1px solid #6200ee;
     outline: 0;
     color: #6200ee;
     min-width: 80px;
-    width: 30%;
+    width: 20%;
     margin: 10px;
-    cursor: pointer
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 10%;
 }
 
 .resbtn:active,
@@ -130,16 +143,22 @@ body {
 .chat_box_wrap {
     position: fixed;
     bottom: 0;
+    left: 0;
+    right: 0;
+    top: 0;
     height: 100%;
     width: 100%
 }
 
 .chat_box {
     bottom: 0;
+    left: 0;
     background: #fff;
     border: 1px solid #e3e3e3;
     margin-right: 8px;
-    height: 100%
+    height: 100%;
+    right: 0;
+    width: 100%;
 }
 
 .chat_head {
@@ -163,7 +182,6 @@ body {
 
 .chat_body {
     height: 85%;
-
     overflow-y: scroll;
     overflow-wrap: break-word;
     overflow-x: hidden
@@ -227,7 +245,7 @@ body {
     border-top-left-radius: 15px;
     border-top-right-radius: 15px;
     left: 0;
-    width: 98%;
+    width: 100%;
     right: 0;
     margin: auto;
     margin-bottom: -250px;
@@ -238,7 +256,6 @@ body {
 .msg_sent {
     background-color: #90f;
     margin-left: auto;
-    text-align: right
 }
 
 .chat_with {
@@ -246,9 +263,9 @@ body {
     cursor: pointer
 }
 
-.msg_recieved {
+.msg_received {
     background-color: #2cb8ff;
-    margin-right: auto
+    margin-right: auto;
 }
 
 .msg {
@@ -264,7 +281,7 @@ body {
     cursor: pointer;
     text-align: left;
     overflow-wrap: break-word;
-    word-break: break-word
+    word-break: break-word;
 }
 
 .img-button-holder {

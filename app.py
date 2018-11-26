@@ -149,8 +149,8 @@ async def upload_bin():
 @app.route("/api/getuser/", strict_slashes=False)
 async def api_tools():
     if not session.get("logged_in") or not session.get("user"):
-        return "__error__", 400
-    return session["user"]
+        return "__error__", 403
+    return Response(f')}}]{session["user"]}', content_type="application/json")
 
 
 @app.route("/api/chat_ids/", methods=["POST"])
@@ -178,7 +178,23 @@ async def get_previous_chats():
 
 @app.route("/api/validate-chat", methods=["POST"], strict_slashes=False)
 async def get_chat_ids():
+    TEST = True
     content_type = "application/octet-stream"
+    if TEST:
+        if session["user"] == "bhavesh":
+            resp = {
+                "chat_id": "OuihgQgoqU-QAAzs",
+                "chat_with": "dummy",
+                "HERE": "bhavesh",
+            }
+        else:
+            resp = {
+                "chat_id": "OuihgQgoqU-QAAzs",
+                "HERE": "dummy",
+                "chat_with": "bhavesh",
+            }
+        return Response(json.dumps(resp), content_type=content_type)
+
     form = await request.form
     idx = form.get("chat_id")
     if not idx or not session.get("logged_in") or not session.get("user"):
@@ -191,6 +207,10 @@ async def get_chat_ids():
     if not data:
         return Response(
             json.dumps({"error": "Invalid ID"}), content_type=content_type, status=403
+        )
+    if session["user"] not in (data.user1, data.user2):
+        return Response(
+            json.dumps({"error": "InvalidID"}), content_type=content_type, status=403
         )
     user1 = data.user1 if not data.user1 == session["user"] else data.user2
     chat_id = data.id_
@@ -365,7 +385,7 @@ class WebsocketResponder:
         self.current_message = msg
         return self.current_message
 
-    async def __send_message(self, message: [dict, str], __socket) -> None:
+    async def _send_message(self, message: [dict, str], __socket) -> None:
         if isinstance(message, str):
             return await __socket.send(message)
         elif isinstance(message, dict):
@@ -375,7 +395,7 @@ class WebsocketResponder:
 
     async def send_message(self, message, rsocket=None):
         socket_object = rsocket or self.socket
-        return await self.__send_message(message, socket_object)
+        return await self._send_message(message, socket_object)
 
     async def parse_request(self) -> bool:
         data = self.current_message
@@ -407,7 +427,7 @@ class WebsocketResponder:
                     {"nproxy": True, "checkOfferer": True, "sendTo": session["user"]},
                     self.send_to,
                 )
-            self.offerer = True if not self._req.get("isOfferer") else False
+            self.offerer = True if self._req.get("isOfferer") else False
             await self.send_message(
                 {
                     "nproxy": True,
@@ -430,18 +450,44 @@ class WebsocketResponder:
             return
         _send_to = msg.get("sendTo")
         self.send_to = app.__sockets__.get(_send_to)
-        if not self.send_to:
+        if not self.send_to and not msg.get("RB"):
             return await self.send_message(
                 {"error": "offline", "offline": True, "sendTo": _send_to}
             )
         self.rtc_data = msg.get("rtcData")
         self.offerer = msg.get("isOfferer")
+        self.get_status = msg.get("_get_status")
+        self.set_status = msg.get("_set_status")
+        self.req_restart = msg.get("requestRestart")
         if self.offerer is not None:
             return await self.offerer_respond()
 
         if self.rtc_data:
-            await self.send_message(
+            return await self.send_message(
                 {"rtcData": self.rtc_data, "sendTo": session["user"]}, self.send_to
+            )
+        if self.get_status:
+            return await self.send_message(
+                {"_status": True, "RB": session["user"]}, self.send_to
+            )
+        if self.set_status:
+            rb = msg.get("RB")
+            if rb == _send_to:
+                await self.send_message(
+                    {"get_status": True, "isOn": True, "sendTo": session["user"]},
+                    self.send_to,
+                )
+            else:
+                _s = app.__sockets__.get(rb)
+                if _s:
+                    await self.send_message(
+                        {"get_status": True, "isOn": False, "sendTo": session["user"]},
+                        _s,
+                    )
+            return
+        if self.req_restart:
+            return await self.send_message(
+                {"restart": True, "sendTo": session["user"]}, self.send_to
             )
 
     async def cred_check(self, _session: dict) -> bool:

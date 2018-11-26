@@ -4,17 +4,14 @@ import {
     makeComponent as H,
     PostRequest,
     noop,
-    dumps,
-    notifyUser,
-    isKeyValObj,
     getUser,
+    _random,
+    trace,
+    notifyUser,
+    ImgAsBlob,
 } from "../commons.js";
-import {
-    Router
-} from "../rtr.js"
-let pc;
-let ws, localConnection, dataChannel;
-let isOfferer, cWith;
+import * as chatUI from "./chatUiRenderer.js"
+let pc, ws, dataChannel, isOfferer, cWith;
 const peerConnectionConfig = {
     iceServers: [{
         urls: 'stun:stun.l.google.com:19302'
@@ -22,7 +19,7 @@ const peerConnectionConfig = {
 };
 const _GlobalScope = {
     websockets: [],
-    chatWith: null,
+    chatWith: "",
     _functions: {}
 }
 const chatComponentBeforeRender = async (args, app) => {
@@ -36,6 +33,7 @@ const chatComponentBeforeRender = async (args, app) => {
 
 function chatComponentOnUnmount() {
     console.log("Unmounting");
+    isOfferer = cWith = undefined;
     _GlobalScope.websockets.forEach(a => {
         "function" === typeof a.close && a.close()
     });
@@ -43,6 +41,7 @@ function chatComponentOnUnmount() {
     Object.keys(_GlobalScope).forEach(a => {
         delete _GlobalScope[a]
     }), _GlobalScope.websockets = [], _GlobalScope._functions = {}, _GlobalScope.chatWith = null;
+    chatUI.destroy(pc, dataChannel);
 }
 const startWebSocketConn = async a => {
     const b = await a._dataWebsocket();
@@ -68,35 +67,39 @@ const isOnline = async b => {
         user: b
     }), "/api/get-userstats/");
     const d = await c.json();
-    return d.status === "online"
+    return d.status === "online";
 };
-/**
- * 
- * @param {String} cWith 
- * @param {Router} app 
- */
+
 function sendMessage(a) {
-    if (ws instanceof WebSocket) {
-        if (typeof a === "string") {
-            ws.send(a)
-        } else if (isKeyValObj(a)) {
-            ws.send(dumps(a))
-        }
+    if (ws) {
+        ws.send(a)
+    } else {
+        return console.log("no active connections found to a websocket")
     }
 };
 
-function startChatSession() {
+function __loadingScreen() {
+    console.log("TODO:Add Notification")
+    const _ = cWith || _GlobalScope.chatWith;
     const _el = $.id("start_chat");
     if (_el) {
         $.empty(_el);
-        _el.remove()
-    }
-    sendMessage("ping");
-    sendMessage({
-        sendTo: cWith,
-        isOfferer: !!isOfferer
-    });
+        _el.appendChild((() => {
+            const a = $.create("div");
+            return a.textContent = `waiting for ${_} to come online`, a;
+        })());
+        const img = $.create("img", {
+            class: "loading-gif",
+            style: {
+                display: "block",
+                margin: "auto"
+            }
+        });
+        _el.appendChild(img)
+        ImgAsBlob("/static/loading.gif").then(src => img.src = src)
+    };
 }
+
 const pcOnicecandidate = async ({
     candidate
 }, c) => {
@@ -110,15 +113,32 @@ const pcOnicecandidate = async ({
     }
 };
 
-function webRTCSessionRenderer(message) {
-    const data = message.data;
-    document.body.innerHTML += `<div>Message From:${_GlobalScope.chatWith}->${data}</div>`
+function startChatSession() {
+    __loadingScreen()
+    sendMessage("ping");
+    sendMessage({
+        sendTo: cWith,
+        isOfferer: !!isOfferer
+    });
 }
 
-function _startActualChat(dc) {
+function getUIOpts() {
+    if (dataChannel && pc && _GlobalScope.chatWith) {
+        return {
+            dataChannel,
+            pc,
+            chat: _GlobalScope.chatWith,
+            app: _GlobalScope.__app,
+            chatID: _GlobalScope.__chatID
+        }
+    }
+}
+
+function __startSessionPing(dc) {
     const _msg = dc.data;
     if (_msg === "__ping__") {
-        dataChannel.onmessage = webRTCSessionRenderer
+        document.title = `WebMsg ${_GlobalScope.chatWith ? `Chat With - ${_GlobalScope.chatWith}` : ""}`
+        chatUI.renderStart(getUIOpts())
     }
 };
 async function startRTCMaybe(start) {
@@ -126,9 +146,14 @@ async function startRTCMaybe(start) {
         //TODO fix firefox bug
         pc = new RTCPeerConnection(peerConnectionConfig);
         pc.onicecandidate = e => pcOnicecandidate(e, cWith)
-        dataChannel = pc.createDataChannel(+new Date())
+        dataChannel = pc.createDataChannel(_random())
         console.log("new Data Channel", dataChannel)
-        dataChannel.onmessage = e => _startActualChat(e)
+        dataChannel.onmessage = e => __startSessionPing(e);
+        dataChannel.onclose = dataChannel.onerror = () => {
+            pc = dataChannel = isOfferer = undefined;
+            console.log("data channel closed");
+            createWebRTCRequest();
+        }
         const x = await pc.createOffer();
         await pc.setLocalDescription(x);
         sendMessage({
@@ -140,7 +165,6 @@ async function startRTCMaybe(start) {
 }
 
 async function parseRTCData(data, c) {
-    console.log(data)
     const {
         rtcData,
         sendTo: chat
@@ -148,8 +172,8 @@ async function parseRTCData(data, c) {
     if (c !== chat) {
         /* TODO add notification using commons.notifyUser
          */
-        console.log(c, chat)
-        //throw new Error("Multiple RTC Connections Not Supported on the Same Page")
+        trace(c, chat);
+        trace("Multiple RTC Connections Not Supported on the Same Page")
     };
     if (rtcData.type === "offer") {
         if (typeof pc === "undefined") {
@@ -157,9 +181,14 @@ async function parseRTCData(data, c) {
             pc.onicecandidate = e => pcOnicecandidate(e, c)
             pc.ondatachannel = x => {
                 dataChannel = x.channel;
-                dataChannel.onmessage = webRTCSessionRenderer;
-                dataChannel.send("__ping__")
+                dataChannel.onclose = dataChannel.onerror = e => {
+                    pc = dataChannel = isOfferer = undefined;
+                    console.log("datachannel Closed");
+                    createWebRTCRequest();
+                }
+                dataChannel.send("__ping__");
                 console.log("Created a Data Channel", x)
+                chatUI.renderStart(getUIOpts())
             }
         };
         await pc.setRemoteDescription(rtcData)
@@ -184,14 +213,16 @@ const handleWebsocketMessage = async (e, cWith) => {
         return sendMessage("ping")
     };
     const msg = JSON.parse(_);
-    console.log(msg)
     const {
+        _status,
+        get_status,
         checkOfferer,
-        set_role,
+        restart,
         rtcData,
-        sendTo
+        sendTo,
+        set_role
     } = msg;
-    cWith = cWith || sendTo
+    cWith = cWith || sendTo || _GlobalScope.chatWith
     if (checkOfferer) {
         return sendMessage({
             sendTo: cWith,
@@ -202,54 +233,84 @@ const handleWebsocketMessage = async (e, cWith) => {
         return await startRTCMaybe(isOfferer)
     } else if (rtcData) {
         await parseRTCData(msg, cWith)
+    } else if (_status) {
+        return sendMessage({
+            sendTo: cWith,
+            _set_status: true,
+            RB: msg.RB,
+            dataChannel: (typeof dataChannel !== "undefined")
+        });
+    } else if (restart) {
+        if (pc && dataChannel && dataChannel.readyState === "open") {
+            dataChannel.onclose = () => {
+                trace("closing data channel", "log")
+            }
+            dataChannel.close();
+            pc.close();
+            pc = dataChannel = isOfferer = undefined;
+        };
+        pc = dataChannel = isOfferer = undefined;
+        isOfferer = undefined
+        startChatSession();
+    } else if (get_status) {
+        if (msg.isOn && sendTo === _GlobalScope.chatWith) {
+            sendMessage({
+                requestRestart: true,
+                sendTo
+            })
+        } else {
+            notifyUser(`Requesting ${sendTo} for a chat session`, {
+                body: " ",
+                messageOnClick: "__close__"
+            });
+            PostRequest({
+                user: _GlobalScope.chatWith,
+            }, "/api/request-chat/")
+        }
     }
 };
 
-function startWebRTCRequest() {
-    console.log("Attempting to start a webrtc connection...");
-    startChatSession()
+function createWebRTCRequest() {
+    /*
+    user is online..this means that there is a possibility that
+    we reloaded our page..which means we were previously in a session
+     */
+    trace("Attempting to start a webrtc connection...", "log");
+    const sendTo = _GlobalScope.chatWith;
+    createStartChatComponent(sendTo, _GlobalScope.__app);
+    __loadingScreen()
+    sendMessage({
+        _get_status: true,
+        sendTo
+    })
+
 }
-/**
- * 
- * @param {Object} args 
- * @param {Router} app 
- */
+
 const chatComponentOnRender = async (args, app) => {
     const chatID = args[0];
+    _GlobalScope.__chatID = chatID
     const validChat = await validateChat(chatID);
     if (!validChat) {
-        return app.pushStatus(500)
+        return app.pushStatus(500, "the chat id you provided is invalid. please try again")
     };
     cWith = validChat.chat_with;
+    _GlobalScope.__app = app
     _GlobalScope.chatWith = cWith
     ws = await startWebSocketConn(app);
-    ws.onmessage = handleWebsocketMessage
-    const userIsOnline = await isOnline(cWith);
-    console.log(userIsOnline)
+    ws.onmessage = handleWebsocketMessage;
+    const userIsOnline = await isOnline(_GlobalScope.chatWith);
+    console.log(`${cWith} is Online-->:${userIsOnline}`)
     //pc is not defined right now..which means we can safely request a connection
     if (!userIsOnline) {
-        await createStartChatComponent(cWith, app);
+        await createStartChatComponent(_GlobalScope.chatWith, app);
     } else {
-        await startWebRTCRequest()
+        createWebRTCRequest();
     }
 };
-const comp = H("div", {
-        id: "main-chat-box",
-        class: "box-s"
-    }, null, null,
-    chatComponentBeforeRender,
-    chatComponentOnRender,
-    [H("div", {
-        class: "main"
-    }, null, null, null, null, [H("div", {
-        id: "results-all"
-    }), H("div", {
-        class: "message-info"
-    })])], "/chat/", chatComponentOnUnmount);
 
-function createStartChatComponent(a, b) {
-    const c = $.id("main-chat-box"),
-        d = H("div", {
+function createStartChatComponent(e, f) {
+    const g = $.id("main-chat-box"),
+        h = H("div", {
             id: "start_chat",
             style: {
                 height: "20%",
@@ -272,22 +333,39 @@ function createStartChatComponent(a, b) {
                 padding: "8px",
                 "justify-content": "center"
             }
-        }, null, null, null, null, [H("div", {
-                style: {
-                    "font-weight": "bold"
-                }
-            }, null, `Start Chat Session with ${a}`),
-            H("div", null, null,
-                "No ongoing chat session detected. Press the button to start a session"),
-            H("button", {
-                style: {
-                    "border-radius": "5px"
-                },
-                class: "resbtn"
-            }, {
-                click: startChatSession
-            }, "Start")
-        ]);
-    b.render(d, c)
+        }, null, null, null, () => {
+            $.id("start_chat").style.height = "fit-content"
+        }, [H("div", {
+            style: {
+                "font-weight": "bold"
+            }
+        }, null, `Start Chat Session with ${e}`), H("div", null, null, "No ongoing chat session detected. Press the button to start a session"), H("button", {
+            style: {
+                "border-radius": "5px",
+                height: "auto"
+            },
+            class: "resbtn"
+        }, {
+            click: startChatSession
+        }, "Start")]);
+    f.render(h, g)
 }
+
+const comp = H("div", {
+        id: "main-chat-box",
+        class: "box-s"
+    },
+    null, null,
+    chatComponentBeforeRender,
+    chatComponentOnRender,
+    [H("div", {
+        class: "main"
+    }, null, null, null, null, [H("div", {
+        id: "results-all"
+    }), H("div", {
+        class: "message-info",
+        id: "message-info"
+    })])], "/chat/", chatComponentOnUnmount);
+
+
 export const chatComponent = comp;

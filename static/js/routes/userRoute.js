@@ -4,7 +4,7 @@ import {
     getIntegrity,
     urlencode,
     $,
-    PostRequest
+    PostRequest,
 } from "../commons.js";
 
 function paintPageResults(b) {
@@ -17,18 +17,22 @@ function paintPageResults(b) {
     }
     $.empty(d);
     for (const f of c) {
-        const g = $.create("a"),
+        const g = $.create("a", {
+                style: {
+                    "text-decoration": "none",
+                    color: "#000",
+                    display: "block"
+                },
+                "data-user": f.user,
+                "title": f.user,
+                "data-chat_id": f.chat_id
+            }),
             h = $.create("button");
         h.textContent = f.user;
         g.appendChild(h);
-        $.set(g, "data-user", f.user);
-        $.set(g, "data-chat_id", f.chat_id);
         g.href = `/#/chat/${f.chat_id}`;
         h.className = "resbtn";
         d.appendChild(g);
-        g.style.textDecoration = "none";
-        g.style.color = "#000";
-        g.style.display = "block"
     }
 }
 const userComponentBeforeRender = async (args, app) => {
@@ -59,22 +63,31 @@ const userComponentOnRender = async (args, app) => {
     const d = await PostRequest(`user=${encodeURIComponent((await getUser()))}`, "/api/chat_ids/");
     const e = await d.json();
     const f = $.id("prev-chats");
-    f.innerHTML = "<div>Your Previous Chats</div>";
+    if (f) {
+        f.innerHTML = "<div>Your Previous Chats</div>";
+    } else {
+        return
+    }
+
     const g = e.previous_chats;
     if (0 === g.length) {
         return f.innerHTML = "No previous chats Found";
     }
     for (const h of g) {
-        const j = $.create("div"),
-            k = $.create("button");
+        const j = $.create("div", {
+                "data-user": h.user,
+                "title": h.user,
+                "data-chat_id": h.chat_id
+            }),
+            k = $.create("button", {
+                class: "resbtn"
+            });
         k.textContent = h.user;
         j.appendChild(k);
-        $.set(j, "data-user", h.user);
-        $.set(j, "data-chat_id", h.chat_id);
         k.onclick = () => {
             location.href = `${window.location.protocol}//${location.host}/#/chat/${h.chat_id}`
         };
-        k.className = "resbtn", f.appendChild(j)
+        f.appendChild(j)
     }
     await app._dataWebsocket()
 };
@@ -140,24 +153,15 @@ const resultsComponent = H("div", {
             style: {
                 "margin-top": "20px"
             },
-        }, null, null, null, null, [H("img", {
-            id: "loading-gif",
-            src: "/static/loading.gif"
-        })]
+        }, null, null, null, null, [
+            H("img", {
+                id: "loading-gif",
+                class: "loading-gif",
+                src: "/static/loading.gif"
+            })
+        ]
 
     )
-])
-const mComponent = H("div", {
-    class: "main"
-}, null, null, null, null, [
-    searchBoxComponent,
-    resultsComponent,
-    H("div", {
-        id: "results-all"
-    }),
-    H("div", {
-        id: 'prev-chats'
-    })
 ])
 export const userComponent = H("div", {
         class: "box-s"
@@ -165,4 +169,15 @@ export const userComponent = H("div", {
     null, null,
     userComponentBeforeRender,
     userComponentOnRender,
-    [mComponent], "/u/")
+    [H("div", {
+        class: "main"
+    }, null, null, null, null, [
+        searchBoxComponent,
+        resultsComponent,
+        H("div", {
+            id: "results-all"
+        }),
+        H("div", {
+            id: 'prev-chats'
+        })
+    ])], "/u/")

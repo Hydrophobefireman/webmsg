@@ -1,8 +1,8 @@
 export const trace = (e, i = "warn") => {
-    console[i](`[${performance.now()}]=>${e}`);
+    console[i](`[logger]--->${e}`);
 };
 export const noop = () => {};
-export const __random__ = (e = 17) => {
+export const __random__ = (e = 15) => {
     return [...Array(e)]
         .map(() => (~~(Math.random() * 16)).toString(16))
         .join("");
@@ -101,7 +101,7 @@ export const $ = {
      * @param {CSSStyleSheet=} c
      * @returns {HTMLElement}
      */
-    create: (a, b, c) => {
+    create: (a, b, c = sheet) => {
         const d = document.createElement(a);
         if (b && "object" == typeof b) {
             const e = Object.keys(b);
@@ -164,13 +164,15 @@ export const DATA = {};
  */
 export const getUser = async () => {
     if (DATA.HERE) return DATA.HERE;
-    const e = await fetch("/api/getuser", {
+    const b = await fetch("/api/getuser", {
         credentials: "include"
     });
-    if (!e.ok) return !1;
-    const i = await e.text();
-    return (DATA.HERE = i), DATA.HERE;
+    if (!b.ok) return !1;
+    const c = await b.text(),
+        d = c.substr(3)
+    return (DATA.HERE = d), DATA.HERE;
 };
+
 /**
  *
  * @param {Object} e
@@ -216,7 +218,7 @@ export const makeComponent = (
     onUnmount
 });
 
-export const notifyUser = function (title, options) {
+export const notifyUser = function (title, options = {}) {
     let body, messageMode, hasImage, actionBox, actionBtn, chat_id, hasAction;
     let actionOnClick, messageOnClick, box, timer, titleBox, content, img;
     box = $.create("div", {
@@ -239,7 +241,7 @@ export const notifyUser = function (title, options) {
         actionBtn.textContent = options.actionText || "Example Button";
         actionBox.appendChild(actionBtn);
     }
-    body = options.body || "New Notification";
+    body = options.body || " ";
     content.textContent = body;
     messageMode = options.messageMode;
     messageOnClick = options.messageOnClick;
@@ -294,4 +296,124 @@ export const makeCSS = d => {
     const e = [];
     for (const f of Object.keys(d)) e.push(`${f}:${d[f]}`);
     return e.join(";");
+};
+
+export const stampFormat = stamp => {
+    try {
+        return Intl.DateTimeFormat("auto", {
+            hour: 'numeric',
+            hour12: !0,
+            minute: 'numeric',
+            second: 'numeric',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric'
+        }).format(new Date(stamp));
+    } catch (e) {
+        return new Date(stamp).toLocaleString()
+    }
+};
+export const _getTime = () => new Date().getTime();
+
+const tmplate = (() => {
+    const b = document.createElement("template");
+    const a = makeCSS({
+        margin: "5px",
+        width: "fit-content",
+        "border-radius": "15px",
+        "max-width": "45%",
+        display: "flex",
+        padding: "6px",
+        "margin-top": "5px",
+        color: "#fff",
+        cursor: "pointer",
+        "text-align": "left",
+        "overflow-wrap": "break-word",
+        "word-break": "break-word"
+    });
+    return b.innerHTML = `<style>:host{${a}}</style><slot></slot>`, b
+})();
+export class CustomElement extends HTMLElement {
+    set _id(val) {
+        this._id_ = val;
+        this.setAttribute("data-msgid", val)
+    }
+    get _id() {
+        return this._id_
+    }
+    constructor(__tmpl, meta) {
+        super();
+        const tmpl = __tmpl || tmplate;
+        const shadowRoot = this.attachShadow({
+            mode: 'open'
+        });
+        shadowRoot.appendChild(tmpl.content.cloneNode(true));
+        this.meta = null;
+        this.data = null
+        this._id_ = 0;
+        if (meta) {
+            this.meta = meta;
+        };
+        this._messagedata = null;
+    }
+};
+
+export const blobToArrayBuffer = blob => new Promise((resolve, reject) => {
+    const reader = new FileReader;
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = e => reject(e);
+    reader.readAsArrayBuffer(blob);
+});
+export const arrayBufferToBlob = (buf, type) => new Blob([buf], {
+    type
+})
+export const arrayBufferToBase64 = buffer => new Promise((resolve, _) => {
+    const blob = new Blob([buffer], {
+        type: 'application/octet-binary'
+    });
+    const reader = new FileReader();
+    reader.onload = evt => {
+        const dataurl = evt.target.result;
+        resolve(dataurl.substr(dataurl.indexOf(',') + 1));
+    };
+    reader.readAsDataURL(blob);
+});
+
+export const base64ToArrayBuffer = async b64 => {
+    const data = await fetch(`data:application/octet-stream;base64,${b64}`);
+    return await data.arrayBuffer();
+};
+
+export const base64ToBlob = async (b64, type) => arrayBufferToBlob(await base64ToArrayBuffer(b64), type);
+export const ImgAsBlob = async a => {
+    try {
+        const b = await fetch(a),
+            c = await b.blob();
+        return URL.createObjectURL(c)
+    } catch (b) {
+        return console.warn(`An error occured while fetching:${a}.Returning ${a} back...`), a
+    }
+};
+export function slidein(a) {
+    a.style.overflow = 'hidden',
+        a.style.padding = '0px',
+        a.style.opacity = 0,
+        a.style.height = '0',
+        a.style.border = 'none',
+        a.style.width = '0'
+}
+
+export function slideout(a) {
+    a.style.padding = '5px',
+        a.style.opacity = 1,
+        a.style.height = 'auto',
+        a.style.width = 'auto',
+        a.style.border = '2px solid #e3e3e3',
+        a.style.overflow = 'visible'
+}
+export const apptSize = a => {
+    const b = 0 | a / 1048576;
+    if (b) return `${b} MB`;
+    const c = 0 | a / 1024;
+    return c ? `${c} KB` : `${a} b`
 };
