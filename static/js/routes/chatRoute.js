@@ -78,7 +78,7 @@ function sendMessage(a) {
     }
 };
 
-function __loadingScreen() {
+async function __loadingScreen() {
     console.log("TODO:Add Notification")
     const _ = cWith || _GlobalScope.chatWith;
     const _el = $.id("start_chat");
@@ -90,13 +90,13 @@ function __loadingScreen() {
         })());
         const img = $.create("img", {
             class: "loading-gif",
+            src: await ImgAsBlob("/static/loading.gif"),
             style: {
                 display: "block",
                 margin: "auto"
             }
         });
         _el.appendChild(img)
-        ImgAsBlob("/static/loading.gif").then(src => img.src = src)
     };
 }
 
