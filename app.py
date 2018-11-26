@@ -178,7 +178,7 @@ async def get_previous_chats():
 
 @app.route("/api/validate-chat", methods=["POST"], strict_slashes=False)
 async def get_chat_ids():
-    TEST = True
+    TEST = False
     content_type = "application/octet-stream"
     if TEST:
         if session["user"] == "bhavesh":
