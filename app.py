@@ -178,7 +178,7 @@ async def get_previous_chats():
 
 @app.route("/api/validate-chat", methods=["POST"], strict_slashes=False)
 async def get_chat_ids():
-    TEST = False
+"""    TEST = False
     content_type = "application/octet-stream"
     if TEST:
         if session["user"] == "bhavesh":
@@ -193,7 +193,7 @@ async def get_chat_ids():
                 "HERE": "dummy",
                 "chat_with": "bhavesh",
             }
-        return Response(json.dumps(resp), content_type=content_type)
+        return Response(json.dumps(resp), content_type=content_type)"""
 
     form = await request.form
     idx = form.get("chat_id")
