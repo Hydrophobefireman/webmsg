@@ -197,6 +197,9 @@ function _renderSingleMessage(_msg, saveToDb) {
         const i = new Image;
         el.appendChild(i);
         ImgAsBlob("/static/attachment.svg").then(src => i.src = src)
+        i.onclick = () => {
+            el.click()
+        }
         el.style.fontSize = "12px";
         el.appendChild(_node);
 

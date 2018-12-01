@@ -1,1 +1,1 @@
-web: bin/start-nginx exec hypercorn app:app --workers 4 --keep-alive 500 -b unix:/tmp/nginx.socket
+web: bin/start-nginx exec hypercorn app:app --workers 1 --keep-alive 500 -b unix:/tmp/nginx.socket

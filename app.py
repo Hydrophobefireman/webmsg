@@ -674,7 +674,7 @@ def has_false_types(_dict, vals):
     falses = []
     _k = _dict.keys()
     for val in vals:
-        if not val in _k:
+        if val not in _k:
             falses.append(val)
     if falses:
         return True, falses
@@ -772,6 +772,11 @@ def alter_chat_data(data, new_message=False, read=False, rstats=False):
         db.session.commit()
         return True
     # pylint: enable=E1101
+
+
+@app.errorhandler(404)
+async def handle404(error):
+    return redirect("/")
 
 
 # for heroku nginx

@@ -25,7 +25,7 @@ import * as idbJs from "./idb.js";
     const getIntegrity = commonsJs.getIntegrity;
     const urlencode = commonsJs.urlencode;
     const trace = commonsJs.trace;
-    const router = new Router($.id("app-root") || document.body);
+    const router = window.router = new Router($.id("app-root") || document.body);
     router.registerRoute(loginComponent);
     router.registerRoute(userComponent);
     router.registerRoute(chatComponent);
