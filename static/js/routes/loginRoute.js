@@ -19,7 +19,7 @@ const _responses = {
     }
 };
 const isValid = a => {
-    if (0 < a.length) return /^[0-9a-zA-Z_.-]+$/.test(a)
+    if (0 < a.length) return /^[0-9a-zA-Z_.-]+$/.test(a);
 };
 
 function checkDataValidity(a) {

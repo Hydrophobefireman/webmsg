@@ -101,6 +101,34 @@ class chatData(db.Model):
         return "<Chat:%r <=> %r>" % (self.user1, self.user2)
 
 
+def get_data_from(self, _dict, _from):
+    mark = None
+    tr = {"messages": {}, "updates": {}}
+    if not isinstance(_from, (str, int)):
+        print("Bad Type")
+        return {}
+    elif isinstance(_from, str):
+        if not _from.isnumeric():
+            print("not a number")
+            return {}
+        mark = int(_from) + 1
+    else:
+        mark = _from + 1
+    tr["updates"] = [
+        {"id": k, "s": v.get("rstamp")}
+        for k, v in _dict.items()
+        if v.get("read") and not v.get("seen_read") and v.get("sender") == self.user
+    ]
+    while 1:
+        data = _dict.get(mark)
+        if data:
+            tr["messages"][mark] = data
+            mark += 1
+        else:
+            break
+    return tr
+
+
 @app.route("/")
 async def main():
     session.permanent = True
@@ -110,6 +138,22 @@ async def main():
     return parse_local_assets(
         html_minify(await render_template("index.html", nonce=session["u-id"]))
     )
+
+
+@app.route("/api/gen_204/", strict_slashes=False)
+async def api_app_wake_up():
+    # __import__("time").sleep(2000)
+    return Response("", status=204)
+
+
+@app.after_request
+async def resp_headers(resp):
+    if "localhost" in request.headers.get("origin", ""):
+        resp.headers["access-control-allow-origin"] = request.headers["origin"]
+    else:
+        resp.headers["access-control-allow-origin"] = "https://chat.pycode.tk"
+    resp.headers["access-control-allow-credentials"] = "true"
+    return resp
 
 
 @app.route("/@/notify/", methods=["POST"])
@@ -134,6 +178,12 @@ async def make_notif():
 async def logout():
     session.clear()
     return redirect("/?auth=0")
+
+
+@app.route("/api/logout/", methods=["POST"])
+async def logout_api():
+    session.clear()
+    return Response(json.dumps({"ok": "logged-out"}))
 
 
 @app.route("/@/binary/", methods=["POST"])
@@ -223,7 +273,10 @@ async def get_chat_ids():
 @app.route("/api/integrity/", methods=["POST"], strict_slashes=False)
 async def api_integ():
     session.permanent = True
-    session.pop("u-id")
+    try:
+        session.pop("u-id")
+    except:
+        pass
     session["u-id"] = secrets.token_urlsafe(20)
     return jsonify({"key": session["u-id"]})
 
@@ -231,6 +284,20 @@ async def api_integ():
 @app.route("/firebase-messaging-sw.js")
 async def fbsw():
     return await send_from_directory("static", "firebase-sw.js")
+
+
+@app.route("/api/fetch-messages", methods=["POST"])
+async def get_prev_messages():
+    if not session.get("user") and not session.get("logged_in"):
+        return Response(json.dumps({"error": "not authenticated"}), status=403)
+    form: dict = await request.form
+    fetch: int = int(form.get("fetch_from", "0"))
+    chat_id: str = form.get("chat_id")
+    _chats = check_chat_data(id_=chat_id)
+    if not _chats:
+        return Response(json.dumps({"error": "bad-chat-id"}), status=500)
+    filtered_chats = {"messages": {}, "updates": {}}
+    # TODO:*
 
 
 @app.route("/login/check/", methods=["GET", "POST"])
@@ -410,6 +477,8 @@ class WebsocketResponder:
         data = self.current_message
         if data == "ping":
             await self.send_message("pong")
+            return False
+        if data == "pong" or data == "__init__":
             return False
         try:
             self._req = json.loads(data)
@@ -777,6 +846,12 @@ def alter_chat_data(data, new_message=False, read=False, rstats=False):
 @app.errorhandler(404)
 async def handle404(error):
     return redirect("/")
+
+
+@app.errorhandler(500)
+async def handle500(error):
+    print(error)
+    return Response(json.dumps({"error": "An unknown error occured on our end.."}))
 
 
 # for heroku nginx

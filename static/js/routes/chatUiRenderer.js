@@ -402,8 +402,6 @@ async function getChatMessages(a, b) {
         c || {}
 }
 
-
-
 let _BINARYMODE;
 let finalBuf, binarymeta;
 let _BCount;
@@ -494,6 +492,7 @@ async function sendBinaryData(dc, data, _m) {
         const _endByte = _startByte + _CHUNK_SIZE;
         const subarr = uint8.subarray(_startByte, _endByte);
         dc.send(subarr);
+        console.log(`Sent data of ->${_CHUNK_SIZE}`)
         const _isReady = await DCMsg();
         if (_isReady.data === "__next__") {
             continue
