@@ -29,17 +29,15 @@ def open_and_read(fn: str, mode: str = "r", strip: bool = True):
     return data
 
 
-def is_logged_in(session):
+def is_logged_in(session: dict) -> bool:
     return session.get("logged_in") and session.get("user")
 
 
-def safe_int(i):
+def safe_int(i) -> int:
     if not isinstance(i, (str, int)):
         print("Bad Type")
         return {}
     elif isinstance(i, str):
-        if not i.isnumeric():
-            raise Exception("not a number")
         return int(i)
     return i
 

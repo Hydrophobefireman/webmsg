@@ -82,9 +82,9 @@ class User(object):
 
 class chatData(db.Model):
     # pylint: disable=E1101
-    id_ = db.Column(db.String(20), primary_key=True)
-    user1 = db.Column(db.String(1000))
-    user2 = db.Column(db.String(1000))
+    id_ = db.Column(db.String(30), primary_key=True)
+    user1 = db.Column(db.String(100))
+    user2 = db.Column(db.String(100))
     chats = db.Column(db.PickleType)
     updates = db.Column(db.PickleType)
     # pylint: enable=E1101
@@ -187,14 +187,22 @@ async def get_updates():
     full_fetch: bool = fetch_from == 0 or fetch_from == "0"
     _chat_data: chatData = check_chat_data(id_=chat_id)
     chats: dict = _chat_data.chats
-    updates = _chat_data.updates
+    for k, v in chats.items():
+        if v.get("sender") != session["user"] and not v.get("rstamp"):
+            chats[k]["read"] = True
+            chats[k]["rstamp"] = time.time() * 1000
+    _chat_data.chats = chats
+    flag_modified(_chat_data, "chats")
+    db.session.merge(_chat_data)
+    db.session.commit()
+    updates: dict = _chat_data.updates
     data: dict = get_data_from(chats, fetch_from, session["user"], "messages")
     return Response(
         json.dumps(
             {
                 "update_data": updates,
                 "message_data": data,
-                "newest_message_id": safe_int(fetch_from) + 1,
+                "newest_message_id": fetch_from,
                 "full_fetch": full_fetch,
                 "sp": time.time() - fetch_time,
             }
@@ -385,7 +393,7 @@ async def get_search_token(nonce):
 
 
 def collect_websocket(func):
-    # https://medium.com/@pgjones/websockets-in-quart-f2067788d1ee
+    # https://medium.com/@pgjobnes/websockets-in-quart-f2067788d1ee
     @wraps(func)
     async def wrapper(*args, **kwargs):
         _obj = websocket._get_current_object()
@@ -395,12 +403,18 @@ def collect_websocket(func):
             if i.idxs == session["user"]:
                 print("Multiple Socket Connections..removing previous one")
                 tr.append(i)
-        [app.__sockets__.remove(i) for i in tr]
+        try:
+            [app.__sockets__.remove(i) for i in tr]
+        except KeyError:
+            pass
         app.__sockets__.add(_obj)
         try:
             return await func(*args, **kwargs)
         except Exception as e:
-            app.__sockets__.remove(_obj)
+            try:
+                app.__sockets__.remove(_obj)
+            except KeyError:
+                pass
             print(f"Removing {_obj.idxs}")
             raise e
 
@@ -492,16 +506,37 @@ class Responder:
         if tpe == "get_role":
             return await self.send_message({"type": tpe, "data": data}, peer_socket)
         if tpe == "update":
-            _chat_id: str = data.get("chat_id")
             update_type: str = data.get("update_type")
             details: dict = data.get("details")
-            if update_type == "get_new_updates":
-                return await self.send_message(
-                    {
-                        "type": "new_updates",
-                        "data": check_chat_data(id_=_chat_id).updates,
-                    }
-                )
+            _chat_id: str = details.get("chat_id")
+            if update_type == "read-update":
+                msgid = details.get("read")
+                stamp = details.get("rstamp")
+                chat_data = check_chat_data(id_=_chat_id)
+                if chat_data:
+                    chts = chat_data.chats
+                    msg = chts.get(str(msgid)) or chts.get(safe_int(msgid))
+                    msg["read"] = True
+                    msg["rstamp"] = stamp
+                    chts[safe_int(msgid)] = msg
+                    chat_data.chats = chts
+                    flag_modified(chat_data, "chats")
+                    db.session.merge(chat_data)
+                    db.session.commit()
+                    print("updated")
+                    return await self.send_message(
+                        {
+                            "type": "chat-update",
+                            "data": {
+                                "chat_id": _chat_id,
+                                "update_type": "read",
+                                "msg": msgid,
+                                "rstamp": stamp,
+                            },
+                        },
+                        peer_socket,
+                    )
+
         if tpe == "send_role":
             print(peer_socket)
             offerer = data.get("is_offerer")
@@ -513,9 +548,25 @@ class Responder:
             )
 
 
-@app.route("/api/update-chats/", methods=["POST"])
-async def update__chats():
-    form = await request.get_json()
+# @app.route("/api/update-chats/", methods=["POST"])
+# async def update__chats():
+#     if not is_logged_in(session):
+#         return Response(
+#             '{"error":"not logged in"}', status=403, content_type="application/json"
+#         )
+#     form = await request.get_json()
+#     _type = form.get("type")
+#     data = form.get("data")
+#     if _type == "read-message":
+#         chat_data = check_chat_data(data.get("chat_id"))
+#         if not chat_data:
+#             return Response(
+#                 json.dumps({"error": "an error occured"}),
+#                 content_type="application/json",
+#             )
+#         msg_id = data.get("msgid")
+#         __sender = data.get("peer")
+#         if __sender==
 
 
 @app.route("/api/instant-message/", methods=["POST"])
@@ -526,10 +577,23 @@ async def instants():
     details = form.get("details")
     _chat_id = details.get("chat_id")
     _data = details.get("data")
+    _new_msg_id = alter_chat_data(_data, _chat_id, True)
+    ws_obj = sockets_get(_data.get("receiver"))
+    if ws_obj:
+        await ws_obj.send(
+            json.dumps(
+                {
+                    "meta": {
+                        "from": session.get("user"),
+                        "sessid": secrets.token_urlsafe(10),
+                    },
+                    "data": {"msgid": _new_msg_id},
+                    "type": "get-update",
+                }
+            )
+        )
     return Response(
-        json.dumps(
-            {"type": "new_message", "data": alter_chat_data(_data, _chat_id, True)}
-        ),
+        json.dumps({"type": "new_message", "data": _new_msg_id}),
         content_type="application/json",
     )
 
@@ -708,7 +772,10 @@ async def handle404(error):
 @app.errorhandler(500)
 async def handle500(error):
     print(error)
-    return Response(json.dumps({"error": "An unknown error occured on our end.."}))
+    return Response(
+        json.dumps({"error": "An unknown error occured on our end.."}),
+        content_type="application/json",
+    )
 
 
 # for heroku nginx
