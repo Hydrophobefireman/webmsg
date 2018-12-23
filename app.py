@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import random
 import re
 import secrets
 import shutil
@@ -9,7 +10,6 @@ from functools import wraps
 from urllib.parse import urlparse
 
 import cloudinary.uploader
-import passlib.hash as pwhash
 from bs4 import BeautifulSoup as bs
 from flask_sqlalchemy import SQLAlchemy
 from htmlmin.minify import html_minify
@@ -31,25 +31,21 @@ from sqlalchemy.orm.attributes import flag_modified
 
 import envs
 from notificationmanager import notify
+from utils import (
+    check_password_hash,
+    dburl,
+    generate_password_hash,
+    get_data_from,
+    is_heroku,
+    open_and_read,
+    safe_int,
+    is_logged_in,
+)
 
 app = Quart(__name__)
 app.__sockets__ = set()
 
 app.secret_key = os.environ.get("_secret-key")
-dburl = os.environ.get("DATABASE_URL")
-
-
-def open_and_read(fn: str, mode: str = "r", strip: bool = True):
-    if not os.path.isfile(fn):
-        return None
-    with open(fn, mode) as f:
-        if strip:
-            data = f.read().strip()
-        else:
-            data = f.read()
-    return data
-
-
 app.config["SQLALCHEMY_DATABASE_URI"] = dburl
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
@@ -90,54 +86,28 @@ class chatData(db.Model):
     user1 = db.Column(db.String(1000))
     user2 = db.Column(db.String(1000))
     chats = db.Column(db.PickleType)
+    updates = db.Column(db.PickleType)
     # pylint: enable=E1101
     def __init__(self, u1, u2, chats={}):
-        self.id_ = secrets.token_urlsafe(12)
+        self.id_ = secrets.token_urlsafe(random.randint(12, 18))
         self.user1 = u1
         self.user2 = u2
         self.chats = chats
+        self.updates = {}
 
     def __repr__(self):
         return "<Chat:%r <=> %r>" % (self.user1, self.user2)
 
 
-def get_data_from(self, _dict, _from):
-    mark = None
-    tr = {"messages": {}, "updates": {}}
-    if not isinstance(_from, (str, int)):
-        print("Bad Type")
-        return {}
-    elif isinstance(_from, str):
-        if not _from.isnumeric():
-            print("not a number")
-            return {}
-        mark = int(_from) + 1
-    else:
-        mark = _from + 1
-    tr["updates"] = [
-        {"id": k, "s": v.get("rstamp")}
-        for k, v in _dict.items()
-        if v.get("read") and not v.get("seen_read") and v.get("sender") == self.user
-    ]
-    while 1:
-        data = _dict.get(mark)
-        if data:
-            tr["messages"][mark] = data
-            mark += 1
-        else:
-            break
-    return tr
-
-
 @app.route("/")
 async def main():
+    if is_heroku(request.url):
+        return redirect("https://chat.pycode.tk")
     session.permanent = True
     session["u-id"] = secrets.token_urlsafe(30)
     if not session.get("user"):
         session["logged_in"] = False
-    return parse_local_assets(
-        html_minify(await render_template("index.html", nonce=session["u-id"]))
-    )
+    return html_minify(await render_template("index.html", nonce=session["u-id"]))
 
 
 @app.route("/api/gen_204/", strict_slashes=False)
@@ -152,14 +122,17 @@ async def resp_headers(resp):
         resp.headers["access-control-allow-origin"] = request.headers["origin"]
     else:
         resp.headers["access-control-allow-origin"] = "https://chat.pycode.tk"
+    resp.headers["Access-Control-Allow-Headers"] = request.headers.get(
+        "Access-Control-Request-Headers", "*"
+    )
     resp.headers["access-control-allow-credentials"] = "true"
     return resp
 
 
-@app.route("/@/notify/", methods=["POST"])
+@app.route("/api/set-notification-token/", methods=["POST"])
 async def make_notif():
     form = await request.form
-    if not session.get("logged_in") or not session.get("user") or not form.get("token"):
+    if not is_logged_in(session) or not form.get("token"):
         return "NO"
     token = form.get("token")
     user = userData.query.filter(
@@ -198,9 +171,35 @@ async def upload_bin():
 # @app.route("/api/get")
 @app.route("/api/getuser/", strict_slashes=False)
 async def api_tools():
-    if not session.get("logged_in") or not session.get("user"):
-        return "__error__", 403
+    if not is_logged_in(session):
+        return Response("__error__", status=403, content_type="application/json")
     return Response(f')}}]{session["user"]}', content_type="application/json")
+
+
+@app.route("/api/updates/", methods=["POST"])
+async def get_updates():
+    fetch_time: float = time.time()
+    form: dict = await request.form
+    if not is_logged_in(session):
+        return Response(json.dumps({"error": "not_authenticated"}), status=403)
+    chat_id: str = form.get("chat_id")
+    fetch_from: int = form.get("fetch_from")
+    full_fetch: bool = fetch_from == 0 or fetch_from == "0"
+    _chat_data: chatData = check_chat_data(id_=chat_id)
+    chats: dict = _chat_data.chats
+    updates = _chat_data.updates
+    data: dict = get_data_from(chats, fetch_from, session["user"], "messages")
+    return Response(
+        json.dumps(
+            {
+                "update_data": updates,
+                "message_data": data,
+                "newest_message_id": safe_int(fetch_from) + 1,
+                "full_fetch": full_fetch,
+                "sp": time.time() - fetch_time,
+            }
+        )
+    )
 
 
 @app.route("/api/chat_ids/", methods=["POST"])
@@ -229,25 +228,9 @@ async def get_previous_chats():
 @app.route("/api/validate-chat", methods=["POST"], strict_slashes=False)
 async def get_chat_ids():
     content_type = "application/octet-stream"
-    """    TEST = False
-    if TEST:
-        if session["user"] == "bhavesh":
-            resp = {
-                "chat_id": "OuihgQgoqU-QAAzs",
-                "chat_with": "dummy",
-                "HERE": "bhavesh",
-            }
-        else:
-            resp = {
-                "chat_id": "OuihgQgoqU-QAAzs",
-                "HERE": "dummy",
-                "chat_with": "bhavesh",
-            }
-        return Response(json.dumps(resp), content_type=content_type)"""
-
     form = await request.form
     idx = form.get("chat_id")
-    if not idx or not session.get("logged_in") or not session.get("user"):
+    if not idx or not is_logged_in(session):
         return Response(
             json.dumps({"error": "Invalid Credentials"}),
             content_type=content_type,
@@ -264,8 +247,17 @@ async def get_chat_ids():
         )
     user1 = data.user1 if not data.user1 == session["user"] else data.user2
     chat_id = data.id_
+    _socket = sockets_get(user1)
+    userHasSocket: str = "online" if _socket else "offline"
     return Response(
-        json.dumps({"chat_id": chat_id, "chat_with": user1, "HERE": session["user"]}),
+        json.dumps(
+            {
+                "is_online": userHasSocket,
+                "chat_id": chat_id,
+                "chat_with": user1,
+                "HERE": session["user"],
+            }
+        ),
         content_type=content_type,
     )
 
@@ -284,20 +276,6 @@ async def api_integ():
 @app.route("/firebase-messaging-sw.js")
 async def fbsw():
     return await send_from_directory("static", "firebase-sw.js")
-
-
-@app.route("/api/fetch-messages", methods=["POST"])
-async def get_prev_messages():
-    if not session.get("user") and not session.get("logged_in"):
-        return Response(json.dumps({"error": "not authenticated"}), status=403)
-    form: dict = await request.form
-    fetch: int = int(form.get("fetch_from", "0"))
-    chat_id: str = form.get("chat_id")
-    _chats = check_chat_data(id_=chat_id)
-    if not _chats:
-        return Response(json.dumps({"error": "bad-chat-id"}), status=500)
-    filtered_chats = {"messages": {}, "updates": {}}
-    # TODO:*
 
 
 @app.route("/login/check/", methods=["GET", "POST"])
@@ -436,163 +414,135 @@ def sockets_get(u):
     return None
 
 
-@app.route("/api/get-userstats/", methods=["POST"])
-async def getstats():
-    ct = "application/json"
-    form = await request.form
-    user = form.get("user")
-    if not user:
-        return Response(json.dumps({"error": "No User Specified"}), content_type=ct)
-    socket = sockets_get(user)
-    print(app.__sockets__)
-    stat = "online" if socket else "offline"
-    return Response(json.dumps({"status": stat}), content_type=ct)
-
-
-class WebsocketResponder:
+class Responder:
     def __init__(self, ws_obj: websocket) -> None:
         self.socket = ws_obj
+        self._chat_meta = {
+            "meta": {"from": session.get("user"), "sessid": secrets.token_urlsafe(10)}
+        }
+        self._user: str = None
         self._req = {}
-        self.offerer = None
-        self.user = None
-
-    async def read_message(self) -> str:
-        msg = await self.socket.receive()
-        self.current_message = msg
-        return self.current_message
-
-    async def _send_message(self, message: [dict, str], __socket) -> None:
-        if isinstance(message, str):
-            return await __socket.send(message)
-        elif isinstance(message, dict):
-            return await __socket.send(json.dumps(message))
-        else:
-            raise TypeError("Only dict and str types are supported")
-
-    async def send_message(self, message, rsocket=None):
-        socket_object = rsocket or self.socket
-        return await self._send_message(message, socket_object)
-
-    async def parse_request(self) -> bool:
-        data = self.current_message
-        if data == "ping":
-            await self.send_message("pong")
-            return False
-        if data == "pong" or data == "__init__":
-            return False
-        try:
-            self._req = json.loads(data)
-            return True
-        except:
-            await self.send_message({"error": "Bad request"})
-            return False
-
-    async def check_validity(self):
-        if self._req.get("nproxy"):
-            return True
-        if not self._req.get("sendTo"):
-            await self.send_message({"error": "Invalid Values"})
-            return False
-        if self._req.get("nproxy"):
-            print("Proxied Message..Ignore")
-            return False
-        return True
-
-    async def offerer_respond(self) -> dict:
-        if self.send_to:
-            if not isinstance(self.offerer, bool):
-                await self.send_message(
-                    {"nproxy": True, "checkOfferer": True, "sendTo": session["user"]},
-                    self.send_to,
-                )
-            self.offerer = True if self._req.get("isOfferer") else False
-            await self.send_message(
-                {
-                    "nproxy": True,
-                    "set_role": not self.offerer,
-                    "sendTo": session["user"],
-                },
-                self.send_to,
-            )
-            print("Sent Role Data")
-            await self.send_message({"set_role": self.offerer})
-        else:
-            # no one is online on the other side..set offerer by default
-            self.offerer = True
-            await self.send_message({"set_role": self.offerer})
-
-    async def create_response(self) -> None:
-        msg = self._req
-        is_valid = await self.check_validity()
-        if not is_valid:
-            return
-        _send_to = msg.get("sendTo")
-        self.send_to = sockets_get(_send_to)
-        if not self.send_to and not msg.get("RB"):
-            return await self.send_message(
-                {"error": "offline", "offline": True, "sendTo": _send_to}
-            )
-        self.rtc_data = msg.get("rtcData")
-        self.offerer = msg.get("isOfferer")
-        self.get_status = msg.get("_get_status")
-        self.set_status = msg.get("_set_status")
-        self.req_restart = msg.get("requestRestart")
-        if self.offerer is not None:
-            return await self.offerer_respond()
-
-        if self.rtc_data:
-            return await self.send_message(
-                {"rtcData": self.rtc_data, "sendTo": session["user"]}, self.send_to
-            )
-        if self.get_status:
-            return await self.send_message(
-                {"_status": True, "RB": session["user"]}, self.send_to
-            )
-        if self.set_status:
-            rb = msg.get("RB")
-            if rb == _send_to:
-                await self.send_message(
-                    {"get_status": True, "isOn": True, "sendTo": session["user"]},
-                    self.send_to,
-                )
-            else:
-                _s = sockets_get(rb)
-                if _s:
-                    await self.send_message(
-                        {"get_status": True, "isOn": False, "sendTo": session["user"]},
-                        _s,
-                    )
-            return
-        if self.req_restart:
-            return await self.send_message(
-                {"restart": True, "sendTo": session["user"]}, self.send_to
-            )
 
     async def cred_check(self, _session: dict) -> bool:
-        if not _session.get("user") or not _session.get("logged_in"):
+        if not is_logged_in(_session):
             await self.send_message(
                 {"error": "Not Authenticated..did you clear your cookies?"}
             )
             return False
-        self.user = _session["user"]
+        self.user: str = _session["user"]
         return True
 
-    def __repr__(self):
-        return "<Websocket Responder>"
+    def parse_json_or_none(self, msg: str) -> dict:
+        try:
+            return json.loads(msg)
+        except:
+            return None
+
+    async def send_string(self, data: str, peer=None) -> None:
+        socket_obj = peer or self.socket
+        if not socket_obj:
+            return print("No socket")
+        return await socket_obj.send(data)
+
+    async def send_message(self, data: dict, peer=None) -> None:
+        unpck = json.dumps({**self._chat_meta, **data})
+        return await self.send_string(unpck, peer)
+
+    async def create_socket_response(self):
+        msg = await self.socket.receive()
+        if msg == "ping" or msg == "pong":
+            return await self.send_string(("ping" if msg == "ping" else "pong"))
+        self.current_message = msg
+        self._data = self.parse_json_or_none(msg)
+        if not self._data:
+            return
+        peer = self._data.get("peer")
+        peer_socket = sockets_get(peer)
+        tpe = self._data.get("type")
+        data = self._data.get("data")
+        if not tpe:
+            return await self.send_message({"error": "Invalid Values"})
+        if tpe == "use_fallback":
+            if peer:
+                return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "rtc_data":
+            return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "message-relay":
+            if is_heroku(websocket.url):
+                await notify_user(session["user"], peer, data)
+            # alter_chat_data({**data, "sender": session["user"], "receiver": peer}, True)
+            return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "direct-relay":
+            return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "start_chat":
+            if peer_socket:
+                return await self.send_message(
+                    {
+                        "type": "online_status",
+                        "data": {
+                            "user": session["user"],
+                            "isonline": True,
+                            "common_chat_id": check_or_create_chat(
+                                peer, session["user"]
+                            ).id_,
+                        },
+                    },
+                    peer_socket,
+                )
+        if tpe == "get_role":
+            return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "update":
+            _chat_id: str = data.get("chat_id")
+            update_type: str = data.get("update_type")
+            details: dict = data.get("details")
+            if update_type == "get_new_updates":
+                return await self.send_message(
+                    {
+                        "type": "new_updates",
+                        "data": check_chat_data(id_=_chat_id).updates,
+                    }
+                )
+        if tpe == "send_role":
+            print(peer_socket)
+            offerer = data.get("is_offerer")
+            await self.send_message(
+                {"type": "set_role", "data": {"is_offerer": not offerer}}
+            )
+            return await self.send_message(
+                {"type": "set_role", "data": {"is_offerer": offerer}}, peer_socket
+            )
+
+
+@app.route("/api/update-chats/", methods=["POST"])
+async def update__chats():
+    form = await request.get_json()
+
+
+@app.route("/api/instant-message/", methods=["POST"])
+async def instants():
+    form = await request.get_json()
+    if not is_logged_in(session):
+        return "{}", 403
+    details = form.get("details")
+    _chat_id = details.get("chat_id")
+    _data = details.get("data")
+    return Response(
+        json.dumps(
+            {"type": "new_message", "data": alter_chat_data(_data, _chat_id, True)}
+        ),
+        content_type="application/json",
+    )
 
 
 @app.websocket("/_/data/")
 @collect_websocket
 async def messenger():
-    ws = WebsocketResponder(websocket)
+    ws = Responder(websocket)
     while 1:
-        await ws.read_message()
         cred = await ws.cred_check(session)
         if not cred:
             return
-        req = await ws.parse_request()
-        if req:
-            await ws.create_response()
+        await ws.create_socket_response()
 
 
 @app.route("/api/users/", methods=["POST"])
@@ -633,98 +583,21 @@ def check_or_create_chat(user1, user2):
     return a
 
 
-async def _make_notify(sender, receiver, d):
-
+async def notify_user(sender=None, receiver=None, d=None):
     notify(receiver, d, userData)
 
 
-def validate_stamp(stamp: int) -> int:
-    if not isinstance(stamp, (str, float, int)) or (
-        isinstance(stamp, str) and not stamp.isnumeric()
-    ):
-        return time.time() * 1000
-    return abs(int(stamp)) if isinstance(stamp, str) else abs(stamp)
-
-
-scripts_dir = os.path.join(app.root_path, "static", "dist")
-if not os.path.isdir(scripts_dir):
-    os.mkdir(scripts_dir)
-
-
-def resolve_local_url(url):
-    # all static assets are location in /static folder..so we dont care about urls like "./"
-    if url.startswith("/"):
-        return url
-    elif url.startswith("."):
-        url = url.lstrip(".")
-    if url.startswith("static"):
-        return "/" + url
-    else:
-        return url
-
-
-def parse_local_assets(html):
-    soup = bs(html, "html.parser")
-    assets = soup.find_all(
-        lambda x: (
-            x.name == "script"
-            and resolve_local_url(x.attrs.get("src", "")).startswith("/")
-        )
-        or (
-            x.name == "link"
-            and resolve_local_url(x.attrs.get("href", "")).startswith("/")
-            and "stylesheet" in x.attrs.get("rel", "")
-        )  # Relative urls
-    )
-    for data in assets:
-        ftype = data.name
-        attr, ext = ("src", ".js") if ftype == "script" else ("href", ".css")
-        src = data.attrs.get(attr)
-        print(f"Parsing asset->{src}")
-        if src.startswith("/"):
-            src = src[1:]
-        _file = os.path.join(app.root_path, src)
-        checksum = checksum_f(_file)
-        name = src.split("/")[-1].split(".")[0] + "." + checksum + ext
-        location = os.path.join("static", "dist", name)
-        if os.path.isfile(os.path.join(app.root_path, location)):
-            print("No change in file..skipping")
-        else:
-            shutil.copyfile(_file, os.path.join(app.root_path, location))
-        data.attrs[attr] = f"/{location}"
-    return str(soup)
-
-
-def checksum_f(filename, meth="md5"):
-    foo = getattr(hashlib, meth)()
-    _bytes = 0
-    total = os.path.getsize(filename)
-    with open(filename, "rb") as f:
-        while _bytes <= total:
-            f.seek(_bytes)
-            chunk = f.read(1024 * 4)
-            foo.update(chunk)
-            _bytes += 1024 * 4
-    return foo.hexdigest()
-
-
-def check_password_hash(_hash, pw):
-    meth = pwhash.pbkdf2_sha512
-    return meth.verify(pw, _hash)
-
-
-def generate_password_hash(pw):
-    meth = pwhash.pbkdf2_sha512
-    return meth.hash(pw)
-
-
-def is_heroku(url):
-    parsedurl = urlparse(url).netloc
-    return (
-        "127.0.0.1" not in parsedurl
-        or "localhost" not in parsedurl
-        or "192.168." not in parsedurl
-    ) and "herokuapp" in parsedurl
+# def checksum_f(filename, meth="md5"):
+#     foo = getattr(hashlib, meth)()
+#     _bytes = 0
+#     total = os.path.getsize(filename)
+#     with open(filename, "rb") as f:
+#         while _bytes <= total:
+#             f.seek(_bytes)
+#             chunk = f.read(1024 * 4)
+#             foo.update(chunk)
+#             _bytes += 1024 * 4
+#     return foo.hexdigest()
 
 
 def upload(imgurl):
@@ -737,21 +610,6 @@ def upload(imgurl):
     )
     a = cloudinary.uploader.upload(imgurl)
     return a
-
-
-def has_false_types(_dict, vals):
-    falses = []
-    _k = _dict.keys()
-    for val in vals:
-        if val not in _k:
-            falses.append(val)
-    if falses:
-        return True, falses
-    return False, None
-
-
-def force_join(_list, lim=","):
-    return lim.join(map(str, _list))
 
 
 def check_chat_data(u1=None, u2=None, id_=None):
@@ -785,6 +643,15 @@ def verify_chat(u1, u2, idx):
         False
 
 
+def flag_chat_updates(column, updates):
+    column.updates = updates
+    flag_modified(column, "updates")
+    # pylint: disable=E1101
+    db.session.merge(column)
+    db.session.commit()
+    # pylint: enable=E1101
+
+
 def create_chat_data(u1: str, u2: str) -> bool:
     if u1 == u2:
         return False
@@ -802,38 +669,28 @@ def create_chat_data(u1: str, u2: str) -> bool:
     # pylint: enable=E1101
 
 
-def alter_chat_data(data, new_message=False, read=False, rstats=False):
+def alter_chat_data(data, chat_id, new_message=False, read=False):
     # pylint: disable=E1101
-    if (read or rstats) and data.get("msgid") is None:
+    if (read) and data.get("msgid") is None:
         raise ValueError("Cannot Update without message ID")
     msgs = {}
-    chat_data = chatData.query.filter_by(id_=data["chat_id"]).first()
+    chat_data = chatData.query.filter_by(id_=chat_id).first()
     msgs = chat_data.chats
     if new_message:
         print("Altering data")
         msg_index = len(msgs)
-        msgs[msg_index] = data["data"]
+        msgs[msg_index] = data
         chat_data.chats = msgs
         flag_modified(chat_data, "chats")
         db.session.merge(chat_data)
         db.session.commit()
         return msg_index
     elif read:
+        # TODO fix
         msgid = data["msgid"]
         edit_ = msgs[msgid]
         edit_["read"] = data["update"]["read"]
         edit_["rstamp"] = data["update"]["rstamp"]
-        edit_["seen_read"] = False
-        msgs[msgid] = edit_
-        chat_data.chats = msgs
-        flag_modified(chat_data, "chats")
-        db.session.merge(chat_data)
-        db.session.commit()
-        return True
-    elif rstats:
-        msgid = data["msgid"]
-        edit_ = msgs[msgid]
-        edit_["seen_read"] = True
         msgs[msgid] = edit_
         chat_data.chats = msgs
         flag_modified(chat_data, "chats")
