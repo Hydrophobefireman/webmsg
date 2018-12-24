@@ -236,7 +236,7 @@ async def get_previous_chats():
     )
 
 
-@app.route("/api/validate-chat", methods=["POST"], strict_slashes=False)
+@app.route("/api/chat-stats", methods=["POST"], strict_slashes=False)
 async def get_chat_ids():
     content_type = "application/octet-stream"
     form = await request.form
