@@ -37,9 +37,9 @@ from utils import (
     generate_password_hash,
     get_data_from,
     is_heroku,
+    is_logged_in,
     open_and_read,
     safe_int,
-    is_logged_in,
 )
 
 app = Quart(__name__)
@@ -93,7 +93,7 @@ class chatData(db.Model):
         self.user1 = u1
         self.user2 = u2
         self.chats = chats
-        self.updates = {}
+        self.updates = []
 
     def __repr__(self):
         return "<Chat:%r <=> %r>" % (self.user1, self.user2)
@@ -187,15 +187,18 @@ async def get_updates():
     full_fetch: bool = fetch_from == 0 or fetch_from == "0"
     _chat_data: chatData = check_chat_data(id_=chat_id)
     chats: dict = _chat_data.chats
+    updates: dict = _chat_data.updates
     for k, v in chats.items():
         if v.get("sender") != session["user"] and not v.get("rstamp"):
-            chats[k]["read"] = True
-            chats[k]["rstamp"] = time.time() * 1000
+            chats[k]["read"]: bool = True
+            stamp: float = time.time() * 1000
+            chats[k]["rstamp"]: float = stamp
     _chat_data.chats = chats
     flag_modified(_chat_data, "chats")
+    # pylint: disable=E1101
     db.session.merge(_chat_data)
     db.session.commit()
-    updates: dict = _chat_data.updates
+    # pylint: enable=E1101
     data: dict = get_data_from(chats, fetch_from, session["user"], "messages")
     return Response(
         json.dumps(
@@ -470,10 +473,10 @@ class Responder:
         self._data = self.parse_json_or_none(msg)
         if not self._data:
             return
-        peer = self._data.get("peer")
-        peer_socket = sockets_get(peer)
-        tpe = self._data.get("type")
-        data = self._data.get("data")
+        peer: str = self._data.get("peer")
+        peer_socket: websocket = sockets_get(peer)
+        tpe: str = self._data.get("type")
+        data: dict = self._data.get("data")
         if not tpe:
             return await self.send_message({"error": "Invalid Values"})
         if tpe == "use_fallback":
@@ -486,6 +489,9 @@ class Responder:
                 await notify_user(session["user"], peer, data)
             # alter_chat_data({**data, "sender": session["user"], "receiver": peer}, True)
             return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "binary-file":
+            if peer_socket:
+                return await self.send_message({"type": tpe, "data": {}}, peer_socket)
         if tpe == "direct-relay":
             return await self.send_message({"type": tpe, "data": data}, peer_socket)
         if tpe == "start_chat":
@@ -505,6 +511,23 @@ class Responder:
                 )
         if tpe == "get_role":
             return await self.send_message({"type": tpe, "data": data}, peer_socket)
+        if tpe == "fetch-update":
+            resp = {"type": "ping-update", "data": []}
+            msg_ids: list = data.get("msgids", [])
+            chat_id: str = data.get("chat_id")
+            chat_data = check_chat_data(id_=chat_id).chats
+            for idx in msg_ids:
+                message: dict = chat_data.get(str(idx)) or chat_data.get(safe_int(idx))
+                if message.get("sender") == session["user"] and message.get("read"):
+                    resp["data"].append(
+                        {
+                            "chat_id": chat_id,
+                            "update_type": "read",
+                            "msg": idx,
+                            "rstamp": message.get("stamp"),
+                        }
+                    )
+            return await self.send_message(resp)
         if tpe == "update":
             update_type: str = data.get("update_type")
             details: dict = data.get("details")
@@ -521,9 +544,11 @@ class Responder:
                     chts[safe_int(msgid)] = msg
                     chat_data.chats = chts
                     flag_modified(chat_data, "chats")
+                    # pylint: disable=E1101
                     db.session.merge(chat_data)
                     db.session.commit()
                     print("updated")
+                    # pylint: enable=E1101
                     return await self.send_message(
                         {
                             "type": "chat-update",
@@ -546,27 +571,6 @@ class Responder:
             return await self.send_message(
                 {"type": "set_role", "data": {"is_offerer": offerer}}, peer_socket
             )
-
-
-# @app.route("/api/update-chats/", methods=["POST"])
-# async def update__chats():
-#     if not is_logged_in(session):
-#         return Response(
-#             '{"error":"not logged in"}', status=403, content_type="application/json"
-#         )
-#     form = await request.get_json()
-#     _type = form.get("type")
-#     data = form.get("data")
-#     if _type == "read-message":
-#         chat_data = check_chat_data(data.get("chat_id"))
-#         if not chat_data:
-#             return Response(
-#                 json.dumps({"error": "an error occured"}),
-#                 content_type="application/json",
-#             )
-#         msg_id = data.get("msgid")
-#         __sender = data.get("peer")
-#         if __sender==
 
 
 @app.route("/api/instant-message/", methods=["POST"])
@@ -651,19 +655,6 @@ async def notify_user(sender=None, receiver=None, d=None):
     notify(receiver, d, userData)
 
 
-# def checksum_f(filename, meth="md5"):
-#     foo = getattr(hashlib, meth)()
-#     _bytes = 0
-#     total = os.path.getsize(filename)
-#     with open(filename, "rb") as f:
-#         while _bytes <= total:
-#             f.seek(_bytes)
-#             chunk = f.read(1024 * 4)
-#             foo.update(chunk)
-#             _bytes += 1024 * 4
-#     return foo.hexdigest()
-
-
 def upload(imgurl):
     clapi_key = os.environ.get("key") or open_and_read("a.cloudinary")
     clapi_secret = os.environ.get("cl_secret") or open_and_read("b.cloudinary")
@@ -676,7 +667,7 @@ def upload(imgurl):
     return a
 
 
-def check_chat_data(u1=None, u2=None, id_=None):
+def check_chat_data(u1=None, u2=None, id_=None) -> chatData:
     if id_:
         dat = chatData.query.filter_by(id_=id_).first()
         if dat:
