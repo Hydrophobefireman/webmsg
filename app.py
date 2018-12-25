@@ -659,7 +659,10 @@ async def notify_user(sender=None, receiver=None, data=None):
         data["media"] = data["message"].get("media")
         data["mediaURL"] = data["message"].get("mediaURL")
         data["message"] = None
-    notify(receiver, data, userData)
+    try:
+        notify(receiver, data, userData)
+    except:
+        pass
 
 
 def upload(imgurl):
