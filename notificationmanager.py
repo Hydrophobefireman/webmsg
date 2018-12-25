@@ -41,7 +41,7 @@ def notify(user, data, db):
     idx: str = userdata.notification_id
 
     data_fs: dict = {"data": json.dumps(data)}
-    message = messaging.Message(data=data_fs, token=idx)
+    message = messaging.Message(data=data_fs, token=idx, webpush={"urgency": "high"})
     return messaging.send(message)
 
 
