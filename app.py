@@ -169,7 +169,7 @@ async def upload_bin():
 
 
 # @app.route("/api/get")
-@app.route("/api/getuser/", strict_slashes=False)
+@app.route("/api/getuser/", methods=["POST"], strict_slashes=False)
 async def api_tools():
     if not is_logged_in(session):
         return Response("__error__", status=403, content_type="application/json")
@@ -485,8 +485,8 @@ class Responder:
         if tpe == "rtc_data":
             return await self.send_message({"type": tpe, "data": data}, peer_socket)
         if tpe == "message-relay":
-            if is_heroku(websocket.url):
-                await notify_user(session["user"], peer, data)
+            if not peer_socket:
+                return await notify_user(session["user"], peer, data)
             # alter_chat_data({**data, "sender": session["user"], "receiver": peer}, True)
             return await self.send_message({"type": tpe, "data": data}, peer_socket)
         if tpe == "binary-file":
@@ -518,6 +518,8 @@ class Responder:
             chat_data = check_chat_data(id_=chat_id).chats
             for idx in msg_ids:
                 message: dict = chat_data.get(str(idx)) or chat_data.get(safe_int(idx))
+                if not message:
+                    continue
                 if message.get("sender") == session["user"] and message.get("read"):
                     resp["data"].append(
                         {
@@ -651,8 +653,13 @@ def check_or_create_chat(user1, user2):
     return a
 
 
-async def notify_user(sender=None, receiver=None, d=None):
-    notify(receiver, d, userData)
+async def notify_user(sender=None, receiver=None, data=None):
+    data["sender"] = sender
+    if isinstance(data.get("message"), dict):
+        data["media"] = data["message"].get("media")
+        data["mediaURL"] = data["message"].get("mediaURL")
+        data["message"] = None
+    notify(receiver, data, userData)
 
 
 def upload(imgurl):
