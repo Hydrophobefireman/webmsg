@@ -661,8 +661,8 @@ async def notify_user(sender=None, receiver=None, data=None):
         data["message"] = None
     try:
         notify(receiver, data, userData)
-    except:
-        pass
+    except Exception as e:
+        print(e)
 
 
 def upload(imgurl):
