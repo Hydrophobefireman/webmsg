@@ -113,6 +113,7 @@ async def main():
 @app.route("/api/gen_204/", strict_slashes=False)
 async def api_app_wake_up():
     # __import__("time").sleep(2000)
+    session["u-id"] = secrets.token_urlsafe(30)
     return Response("", status=204)
 
 
