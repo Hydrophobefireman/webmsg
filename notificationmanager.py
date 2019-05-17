@@ -45,4 +45,3 @@ def notify(user, data, db):
     message = messaging.Message(data=data_fs, token=idx, webpush=config)
     return messaging.send(message)
 
-

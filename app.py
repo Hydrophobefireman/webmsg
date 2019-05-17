@@ -788,6 +788,12 @@ def open_to_nginx():
         pass
 
 
+@app.before_request
+def user_agent():
+    if not session.get("u-id"):
+        print(request.headers.get("user-agent"))
+
+
 # WebRTC signalling thorugh-->WebSockets..set up a signalling mechanism
 
 if __name__ == "__main__":
