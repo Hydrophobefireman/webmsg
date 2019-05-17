@@ -300,7 +300,7 @@ async def login():
         reqform.get("password"),
         reqform.get("integrity"),
     )
-    if user is None or password is None or integrity != session["u-id"]:
+    if user is None or password is None or integrity != session.get("u-id", ""):
         resp = await make_response(
             json.dumps({"error": "fields_empty_or_session_error"})
         )

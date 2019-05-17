@@ -46,16 +46,3 @@ def notify(user, data, db):
     return messaging.send(message)
 
 
-"""def notify(user, data, db):
-    userdata = db.query.filter_by(user=user).first()
-    if not userdata:
-        return None
-    if not userdata.notification_id:
-        return None
-    idx = userdata.notification_id
-    headers = {"Authorization": f"Bearer {_get_new_access_token().access_token}"}
-    data_fs = {"message": {"data": {"data": json.dumps(data)}, "token": idx}}
-    req = requests.post(URL, headers=headers, json=(data_fs))
-    print(req.text)
-    return req.text"""
-
