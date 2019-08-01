@@ -102,7 +102,7 @@ class chatData(db.Model):
 @app.route("/")
 async def main():
     if is_heroku(request.url):
-        return redirect("https://chat.pycode.tk")
+        return redirect("https://chat.pycode.cf")
     session.permanent = True
     session["u-id"] = secrets.token_urlsafe(30)
     if not session.get("user"):
