@@ -102,7 +102,7 @@ class chatData(db.Model):
 @app.route("/")
 async def main():
     if is_heroku(request.url):
-        return redirect("https://chat.pycode.cf")
+        return redirect("https://chat.pycode.tk")
     session.permanent = True
     session["u-id"] = secrets.token_urlsafe(30)
     if not session.get("user"):
@@ -122,7 +122,7 @@ async def resp_headers(resp):
     if "localhost" in request.headers.get("origin", ""):
         resp.headers["access-control-allow-origin"] = request.headers["origin"]
     else:
-        resp.headers["access-control-allow-origin"] = "https://chat.pycode.cf"
+        resp.headers["access-control-allow-origin"] = "https://chat.pycode.tk"
     resp.headers["Access-Control-Allow-Headers"] = request.headers.get(
         "Access-Control-Request-Headers", "*"
     )
