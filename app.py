@@ -358,7 +358,7 @@ def collect_websocket(func):
 @app.websocket("/_/data/")
 @collect_websocket
 async def messenger():
-    session = get_session(request)
+    session = quart_session
     ws = Responder(websocket)
     while 1:
         cred = await ws.cred_check(session)
@@ -397,7 +397,7 @@ async def instants():
 class Responder:
     def __init__(self, ws_obj: websocket) -> None:
         self.socket = ws_obj
-        session = get_session(request)
+        session = quart_session
         self._chat_meta = {
             "meta": {"from": session.get("user"), "sessid": secrets.token_urlsafe(10)}
         }
