@@ -329,7 +329,7 @@ def collect_websocket(func):
     # https://medium.com/@pgjobnes/websockets-in-quart-f2067788d1ee
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        session = get_session(request)
+        session = quart_session
         _obj = websocket._get_current_object()
         setattr(_obj, "idxs", session["user"])
         tr = []
@@ -430,7 +430,7 @@ class Responder:
         return await self.send_string(unpck, peer)
 
     async def create_socket_response(self):
-        session = get_session(request)
+        session = quart_session
         msg = await self.socket.receive()
         if msg == "ping" or msg == "pong":
             return await self.send_string(("ping" if msg == "ping" else "pong"))
