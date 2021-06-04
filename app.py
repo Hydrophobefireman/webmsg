@@ -771,10 +771,7 @@ async def make_notif():
 
 @app.after_request
 async def resp_headers(resp):
-    if "localhost" in request.headers.get("origin", ""):
-        resp.headers["access-control-allow-origin"] = request.headers["origin"]
-    else:
-        resp.headers["access-control-allow-origin"] = "https://chat.pycode.tk"
+    resp.headers["access-control-allow-origin"] = request.headers.get("origin", "https://chat.pycode.tk")
     resp.headers["Access-Control-Allow-Headers"] = request.headers.get(
         "Access-Control-Request-Headers", "*"
     )
