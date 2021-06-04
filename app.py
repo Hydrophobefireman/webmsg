@@ -771,7 +771,7 @@ async def make_notif():
 
 @app.after_request
 async def resp_headers(resp):
-    resp.headers["access-control-allow-origin"] = request.headers.get("origin", "https://chat.pycode.tk")
+    resp.headers["access-control-allow-origin"] = request.headers.get("origin", "https://chat.hpfm.dev")
     resp.headers["Access-Control-Allow-Headers"] = request.headers.get(
         "Access-Control-Request-Headers", "*"
     )
