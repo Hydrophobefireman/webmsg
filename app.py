@@ -1,34 +1,29 @@
-import hashlib
 import json
 import os
 import random
 import re
 import secrets
-import shutil
 import time
 from enum import Enum
 from functools import wraps
-from urllib.parse import urlparse
+
 
 import cloudinary.uploader
 from bs4 import BeautifulSoup as bs
 from flask_sqlalchemy import SQLAlchemy
-from htmlmin.minify import html_minify
+
 from quart import (
     Quart,
     Response,
-    abort,
     jsonify,
-    make_response,
     redirect,
-    render_template,
     request,
     send_from_directory,
     session as quart_session,
     websocket,
 )
 from quart.sessions import SecureCookieSessionInterface
-from secure import SecureCookie
+from secure import  SecureCookie
 from sqlalchemy import func, or_
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -39,7 +34,6 @@ from utils import (
     dburl,
     generate_password_hash,
     get_data_from,
-    is_heroku,
     is_logged_in,
     open_and_read,
     safe_int,
@@ -57,7 +51,7 @@ app.__sockets__ = set()
 sec = SecureCookie(samesite=SameSite.none)
 
 app.secret_key = os.environ.get("_secret-key")
-app.config["SQLALCHEMY_DATABASE_URI"] = dburl
+app.config["SQLALCHEMY_DATABASE_URI"] = dburl.replace("postgres://", "postgresql://")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3163.100 Safari/537.36"
@@ -704,9 +698,9 @@ async def get_updates():
     updates: dict = _chat_data.updates
     for k, v in chats.items():
         if v.get("sender") != session["user"] and not v.get("rstamp"):
-            chats[k]["read"]: bool = True
+            chats[k]["read"] = True
             stamp: float = time.time() * 1000
-            chats[k]["rstamp"]: float = stamp
+            chats[k]["rstamp"] = stamp
     _chat_data.chats = chats
     flag_modified(_chat_data, "chats")
     # pylint: disable=E1101
@@ -771,7 +765,9 @@ async def make_notif():
 
 @app.after_request
 async def resp_headers(resp):
-    resp.headers["access-control-allow-origin"] = request.headers.get("origin", "https://chat.hpfm.dev")
+    resp.headers["access-control-allow-origin"] = request.headers.get(
+        "origin", "https://chat.hpfm.dev"
+    )
     resp.headers["Access-Control-Allow-Headers"] = request.headers.get(
         "Access-Control-Request-Headers", "*"
     )
